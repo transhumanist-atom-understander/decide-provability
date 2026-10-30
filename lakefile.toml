@@ -1,0 +1,9 @@
+name = "gl-tableau"
+defaultTargets = ["tableau"]
+
+[[lean_lib]]
+name = "GLTableau"
+
+[[lean_exe]]
+name = "tableau"
+root = "Main"
