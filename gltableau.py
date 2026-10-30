@@ -1,11 +1,10 @@
-#!/usr/bin/env python3
 """Build the tableau of a GL sentence read from stdin, with letters as sentence letters and
 connectives → ∧ ∨ ¬ ↔ □ ◇ ⊥ ⊤ at their usual precedences:
 
-    echo '□(□p → p) → □p' | ./gltableau.py          # as text
-    echo '□(□p → p) → □p' | ./gltableau.py --tex    # as a prooftree
-    echo '□(□p → p) → □p' | ./gltableau.py --lean   # as a ProvabilityLogic derivation
-    echo '□(□p → p) → □p' | ./gltableau.py --verify # ... checked by Lean
+    echo '□(□p → p) → □p' | uv run gltableau.py          # as text
+    echo '□(□p → p) → □p' | uv run gltableau.py --tex    # as a prooftree
+    echo '□(□p → p) → □p' | uv run gltableau.py --lean   # as a ProvabilityLogic derivation
+    echo '□(□p → p) → □p' | uv run gltableau.py --verify # ... checked by Lean
 
 Exits 0 if the tableau closes (the sentence is a theorem), 1 if not, 2 on a parse error;
 --verify exits 0 only if Lean accepts the derivation.
