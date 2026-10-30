@@ -1,0 +1,5 @@
+#!/bin/sh
+# The tableau in the Lean file $1 as a LaTeX prooftree.
+f=$(realpath "$1") && cd "$(dirname "$0")" && cat "$f" - <<'LEAN' | lake env lean --stdin
+#eval IO.print t.tex
+LEAN

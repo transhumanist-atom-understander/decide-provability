@@ -1,5 +1,11 @@
 name = "gl-tableau"
-defaultTargets = ["tableau"]
+defaultTargets = ["GLTableau", "tableau"]
+# Mathlib and the rest come from the ProvabilityLogic checkout, already built there.
+packagesDir = "../ProvabilityLogic/.lake/packages"
+
+[[require]]
+name = "ProvabilityLogic"
+path = "../ProvabilityLogic"
 
 [[lean_lib]]
 name = "GLTableau"

@@ -1,5 +1,7 @@
 import Std.Internal.Parsec
 
+namespace Tableau
+
 /-- A formula of GL, with every connective Priest's tableau rules speak about. -/
 inductive Formula
   | atom (name : String)
@@ -13,33 +15,29 @@ inductive Formula
   | dia (A : Formula)
   deriving DecidableEq
 
+instance : Coe String Formula := ⟨.atom⟩
+
+-- `ProvabilityLogic`'s symbols for the connectives, for the tableau's own code. They are
+-- scoped so as not to clash with `ProvabilityLogic`'s own, which the `.lean` files of tableaux
+-- avoid by naming the constructors instead.
+namespace Notation
+scoped notation:max "⊥" => Formula.bot
+scoped prefix:max "∼" => Formula.neg
+scoped infixr:35 " ⋏ " => Formula.and
+scoped infixr:30 " ⋎ " => Formula.or
+scoped infixr:25 " 🡒 " => Formula.imp
+scoped infix:20 " 🡘 " => Formula.iff
+scoped prefix:max "□" => Formula.box
+scoped prefix:max "◇" => Formula.dia
+end Notation
+
+open Notation
+
 namespace Formula
 
--- `ProvabilityLogic`'s symbols, at Lean's usual precedences.
-prefix:max "#" => atom
-notation:max "⊥" => bot
-prefix:max "∼" => neg
-infixr:35 " ⋏ " => and
-infixr:30 " ⋎ " => or
-infixr:25 " 🡒 " => imp
-infix:20 " 🡘 " => iff
-prefix:max "□" => box
-prefix:max "◇" => dia
-
-/-- `¬A`, or `B` if `A` is `¬B`. -/
-def negate : Formula → Formula
-  | ∼A => A
-  | A => ∼A
-
-/-- The atoms, in order of first occurrence. -/
-def atoms : Formula → List String
-  | #a => [a]
-  | ⊥ => []
-  | ∼A | □A | ◇A => atoms A
-  | A ⋏ B | A ⋎ B | A 🡒 B | A 🡘 B => (atoms A ++ atoms B).eraseDups
-
 open Std.Internal.Parsec String in
-/-- `¬ □ ◇` bind tightest, then `∧`, `∨`, `→`, `↔`, each associating to the right; `⊤` is `¬⊥`. -/
+/-- `¬ □ ◇ ⊡` bind tightest, then `∧`, `∨`, `→`, `↔`, each associating to the right; `⊤` is
+`¬⊥` and `⊡A` is `A ∧ □A`. -/
 partial def parse (s : String) : Except String Formula := (ws *> formula <* eof).run s
 where
   formula : Parser Formula := binary [("↔", iff), ("→", imp), ("∨", or), ("∧", and)]
@@ -51,6 +49,7 @@ where
       (do tok sym; pure (op A (← binary ops))) <|> pure A
   unary : Parser Formula :=
     (tok "¬" *> neg <$> unary) <|> (tok "□" *> box <$> unary) <|> (tok "◇" *> dia <$> unary)
+    <|> (tok "⊡" *> (fun A => A ⋏ □A) <$> unary)
     <|> (tok "⊥" *> pure ⊥) <|> (tok "⊤" *> pure ∼⊥)
     <|> (tok "(" *> formula <* tok ")")
     <|> atom <$> (many1Chars asciiLetter <* ws)
@@ -69,7 +68,7 @@ def Style.tex : Style :=
 
 /-- `A` in style `s`, with parentheses around any operand that has a binary connective. -/
 def render (s : Style) : Formula → String
-  | #a => a
+  | atom a => a
   | ⊥ => s.bot
   | ∼A => s.neg ++ operand A (render s A)
   | □A => s.box ++ operand A (render s A)
@@ -81,24 +80,25 @@ def render (s : Style) : Formula → String
 where
   /-- The operand `A`, rendered as `r`, parenthesized if it has a binary connective. -/
   operand : Formula → String → String
-    | #_, r | ⊥, r | ∼_, r | □_, r | ◇_, r => r
+    | atom _, r | ⊥, r | ∼_, r | □_, r | ◇_, r => r
     | _, r => s!"({r})"
 
 instance : ToString Formula := ⟨render .unicode⟩
 
-/-- `A` as a `Formula ℕ` of `ProvabilityLogic`, fully parenthesized, the atoms numbered by their
-place in `atoms`. `◇A` becomes `¬□¬A` with the inner `¬` cancelled by `negate`, as in the
-tableau rule for `◇`. -/
-def lean (atoms : List String) : Formula → String
-  | #a => s!"(#{atoms.idxOf a})"
-  | ⊥ => "(⊥ : Formula ℕ)"
-  | ∼A => s!"(∼{lean atoms A})"
-  | □A => s!"(□{lean atoms A})"
-  | ◇∼A => s!"(∼(□{lean atoms A}))"
-  | ◇A => s!"(∼(□(∼{lean atoms A})))"
-  | A ⋏ B => s!"({lean atoms A} ⋏ {lean atoms B})"
-  | A ⋎ B => s!"({lean atoms A} ⋎ {lean atoms B})"
-  | A 🡒 B => s!"({lean atoms A} 🡒 {lean atoms B})"
-  | A 🡘 B => s!"({lean atoms A} 🡘 {lean atoms B})"
+/-- `A` as a Lean term naming the constructors, as in the `.lean` file of a tableau. -/
+protected def repr : Formula → String
+  | atom a => a.quote
+  | ⊥ => ".bot"
+  | ∼A => s!"(.neg {A.repr})"
+  | □A => s!"(.box {A.repr})"
+  | ◇A => s!"(.dia {A.repr})"
+  | A ⋏ B => s!"(.and {A.repr} {B.repr})"
+  | A ⋎ B => s!"(.or {A.repr} {B.repr})"
+  | A 🡒 B => s!"(.imp {A.repr} {B.repr})"
+  | A 🡘 B => s!"(.iff {A.repr} {B.repr})"
+
+instance : Repr Formula := ⟨fun A _ => A.repr⟩
 
 end Formula
+
+end Tableau

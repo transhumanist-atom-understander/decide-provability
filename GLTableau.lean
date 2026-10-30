@@ -1,1 +1,2 @@
-import GLTableau.Print
+import GLTableau.Tableau
+import GLTableau.Check

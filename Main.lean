@@ -1,15 +1,11 @@
-import GLTableau
+import GLTableau.Tableau
 
-/-- Reads a sentence from stdin and prints its tableau as text, or with `--tex` as LaTeX, or
-with `--lean` as a derivation for `ProvabilityLogic`. Exits 0 if the tableau closes, 1 if
-not, 2 if the sentence doesn't parse. -/
-def main (args : List String) : IO UInt32 := do
-  match Formula.parse (← (← IO.getStdin).getLine) with
+/-- Reads a sentence of GL from stdin and prints its tableau as a Lean file. Exits 0 if the
+tableau closes (the sentence is a theorem), 1 if not, 2 if the sentence doesn't parse. -/
+def main : IO UInt32 := do
+  match Tableau.Formula.parse (← (← IO.getStdin).readToEnd) with
   | .error e => IO.eprintln e; return 2
   | .ok A =>
-    let t := tableau A
-    IO.print <| match args with
-      | ["--tex"] => tex A t
-      | ["--lean"] => lean A t
-      | _ => text A t
-    return if t.isClosed then 0 else 1
+    let t := Tableau.of A
+    IO.print t.lean
+    return if t.tree.isClosed then 0 else 1
