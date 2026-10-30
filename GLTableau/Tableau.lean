@@ -157,8 +157,11 @@ def tex (t : Tableau) : String :=
   "\\begin{prooftree}{not line numbering}" ++ Tree.chain [.fml 0 ∼t.sentence] 1 (t.tree.tex 2)
     ++ "\n\\end{prooftree}\n"
 
-/-- `t` as a Lean file defining it as `t`, for `tex` and `verify`. -/
+def claim (t : Tableau) : String :=
+  s!"{t.sentence} is {if t.tree.isClosed then "" else "not "}a theorem of GL"
+
+/-- `t` as a Lean file defining it as `t`, to print or to verify. -/
 def lean (t : Tableau) : String :=
-  s!"import GLTableau\n\ndef t : Tableau where\n  sentence := {t.sentence.repr}\n  tree :={t.tree.repr 2}\n"
+  s!"import GLTableau\n\n/-- {t.claim} -/\ndef t : Tableau where\n  sentence := {t.sentence.repr}\n  tree :={t.tree.repr 2}\n"
 
 end Tableau

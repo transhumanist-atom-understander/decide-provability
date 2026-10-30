@@ -1,6 +1,0 @@
-#!/bin/sh
-# Has Lean check, with ProvabilityLogic, what the tableau in the Lean file $1 shows.
-f=$(realpath "$1") && cd "$(dirname "$0")" && cat "$f" - <<'LEAN' | lake env lean --stdin
-#eval IO.println t.claim
-example : t.verdict := t.verified
-LEAN

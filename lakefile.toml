@@ -1,15 +1,16 @@
 name = "gl-tableau"
 defaultTargets = ["GLTableau", "tableau"]
-# Mathlib and the rest come from the ProvabilityLogic checkout, already built there.
-packagesDir = "../ProvabilityLogic/.lake/packages"
 
 [[require]]
 name = "ProvabilityLogic"
-path = "../ProvabilityLogic"
+git = "https://github.com/FormalizedFormalLogic/ProvabilityLogic"
+rev = "60c41f4e6b1914b5f24f498d47c2cb8c003160f6"
 
 [[lean_lib]]
 name = "GLTableau"
 
+# The server loads `GLTableau` at run time, so it links neither it nor Mathlib.
 [[lean_exe]]
 name = "tableau"
 root = "Main"
+supportInterpreter = true

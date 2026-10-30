@@ -189,9 +189,6 @@ def Verdict (A : _root_.Formula String) : Bool → Prop
 
 abbrev verdict (t : Tableau) : Prop := Verdict t.sentence.pl t.tree.isClosed
 
-def claim (t : Tableau) : String :=
-  s!"{t.sentence} is {if t.tree.isClosed then "" else "not "}a theorem of GL"
-
 /-- The derivation of a closed tableau, or the countermodel of an open one, as a proof of its
 verdict, if its rules were applied properly. -/
 def certificate (t : Tableau) : Option (PLift (Verdict t.sentence.pl t.tree.isClosed)) :=
