@@ -1,13 +1,17 @@
-# gl-tableau
+# decide-provability
 
 Priest-style labelled tableaux for sentences of GL (Gödel–Löb provability logic), as in
 Priest's *An Introduction to Non-Classical Logic* §1.4 and §2.4, with the rule for `¬□` that
-makes them GL tableaux, checked by [`ProvabilityLogic`](https://github.com/FormalizedFormalLogic/ProvabilityLogic).
-It is a Lean library, `GLTableau`, and a server, `tableau`, that the Python package
-[`gltableau`](../wrap-tableau) runs; use it from there.
+makes them GL tableaux. It is a Lean library, `GLTableau`, and a server, `tableau`, that the
+Python package `gltableau` of
+[wrap-provability](https://github.com/transhumanist-atom-understander/wrap-provability) runs;
+use it from there. It depends on nothing but Lean, so it builds in seconds:
 
-    $ lake exe cache get   # Mathlib's prebuilt artifacts
-    $ lake build           # then Foundation and ProvabilityLogic, from source: slow, once
+    $ lake build
+
+Having Lean check what a tableau shows is the separate project
+[verify-provability](https://github.com/transhumanist-atom-understander/verify-provability),
+which depends on this one and on `ProvabilityLogic`, hence Mathlib.
 
 `tableau` reads requests from stdin, one JSON object per line, and answers each on a line
 of stdout. `{"sentence": A}` is answered with `{"closed": ..., "lean": ...}`, the tableau for
@@ -15,14 +19,10 @@ of stdout. `{"sentence": A}` is answered with `{"closed": ..., "lean": ...}`, th
 `¬ □ ◇ ⊡` bind tightest, then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read
 as `¬⊥` and `⊡A` as `A ∧ □A`. `{"lean": source}` is answered with `{"output": ...,
 "errors": ...}`: what the `#eval`s of the Lean file `source` print, and Lean's errors, with
-the file's header taken to be `import GLTableau`. That import is loaded once, when the server
-starts, which takes a couple of seconds, most of it Mathlib; each request then takes a
-fraction of a second. So the tableau in a file `t.lean` is printed as a `prooftree` of the
-`prooftrees` LaTeX package by sending the file with `#eval IO.print t.tex` added, and Lean
-checks what it shows, that its sentence is in `LogicGL` if it closed, by the derivation it is
-in the labelled sequent calculus `G3KGL`, and that it is not if a branch stayed open, by the
-finite Kripke countermodel the branch describes, by sending it with
-`theorem proof : t.verdict := t.verified` added.
+the file's own `import`s ignored in favour of `GLTableau`, loaded once, when the server
+starts; each request then takes a fraction of a second. So the tableau in a file `t.lean` is
+printed as a `prooftree` of the `prooftrees` LaTeX package by sending the file with
+`#eval IO.print t.tex` added.
 
     $ echo '{"sentence": "□(□p → p) → □p"}' | lake exe tableau
     {"closed":true,"lean":"import GLTableau\n\n/-- □(□p → p) → □p is a theorem of GL -/\ndef t : Tableau where ..."}
@@ -53,8 +53,7 @@ there; the modal rules only add lines that are new.
 - `GLTableau/Formula.lean`: formulas, their parser, and their LaTeX and Lean printers.
 - `GLTableau/Tableau.lean`: lines, the tree a tableau builds, the rules, Priest's procedure,
   and the `Tableau` a Lean file defines.
-- `GLTableau/Check.lean`: a tableau as a derivation in `G3KGL`, an open branch as a
-  countermodel, and the theorem `Tableau.verified` that Lean's kernel proves by evaluating
-  them.
-- `Main.lean`: the server `tableau`.
-- `practice-notebook-examples.txt`: sentences to try.
+- `GLTableau.lean`: the library the Lean files of tableaux import: the two modules above.
+- `GLTableau/Server.lean`: `Tableau.serve`, the request loop, given the modules to load;
+  `verify-provability` runs it too, with its own modules.
+- `Main.lean`: the server `tableau`, `Tableau.serve` with `GLTableau`.

@@ -1,15 +1,10 @@
-name = "gl-tableau"
+name = "decide-provability"
 defaultTargets = ["GLTableau", "tableau"]
-
-[[require]]
-name = "ProvabilityLogic"
-git = "https://github.com/FormalizedFormalLogic/ProvabilityLogic"
-rev = "60c41f4e6b1914b5f24f498d47c2cb8c003160f6"
 
 [[lean_lib]]
 name = "GLTableau"
 
-# The server loads `GLTableau` at run time, so it links neither it nor Mathlib.
+# The server imports `GLTableau` at run time, into the environment it elaborates requests in.
 [[lean_exe]]
 name = "tableau"
 root = "Main"
