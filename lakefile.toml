@@ -9,4 +9,4 @@ name = "GLTableau"
 [[require]]
 name = "REPL"
 git = "https://github.com/augustepoiroux/repl"
-rev = "v1.3.19_lean-toolchain-v4.35.0"
+rev = "v1.3.19_lean-toolchain-v4.34.0"
