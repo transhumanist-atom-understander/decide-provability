@@ -36,8 +36,9 @@ open Notation
 namespace Formula
 
 open Std.Internal.Parsec String in
-/-- Sentence letters are words of Latin or Greek letters; `¬ □ ◇ ⊡` bind tightest, then `∧`,
-`∨`, `→`, `↔`, each associating to the right; `⊤` is `¬⊥` and `⊡A` is `A ∧ □A`. -/
+/-- A sentence letter is any run of characters other than whitespace, parentheses and the
+connectives; `¬ □ ◇ ⊡` bind tightest, then `∧`, `∨`, `→`, `↔`, each associating to the right;
+`⊤` is `¬⊥` and `⊡A` is `A ∧ □A`. -/
 partial def parse (s : String) : Except String Formula := (ws *> formula <* eof).run s
 where
   formula : Parser Formula := binary [("↔", iff), ("→", imp), ("∨", or), ("∧", and)]
@@ -52,10 +53,8 @@ where
     <|> (tok "⊡" *> (fun A => A ⋏ □A) <$> unary)
     <|> (tok "⊥" *> pure ⊥) <|> (tok "⊤" *> pure ∼⊥)
     <|> (tok "(" *> formula <* tok ")")
-    <|> atom <$> (many1Chars (satisfy isLetter) <* ws)
+    <|> atom <$> (many1Chars (satisfy fun c => !c.isWhitespace && !"()¬□◇⊡⊥⊤∧∨→↔".contains c) <* ws)
   tok (s : String) : Parser Unit := skipString s <* ws
-  /-- A Latin letter, or one of the Greek and Coptic block. -/
-  isLetter (c : Char) : Bool := c.isAlpha || (0x370 ≤ c.val && c.val ≤ 0x3FF)
 
 /-- How to spell the connectives. -/
 structure Style where
