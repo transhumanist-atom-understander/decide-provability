@@ -15,14 +15,15 @@ which depends on this one and on `ProvabilityLogic`, hence Mathlib.
 
 `tableau` reads requests from stdin, one JSON object per line, and answers each on a line
 of stdout. `{"sentence": A}` is answered with `{"closed": ..., "lean": ...}`, the tableau for
-`A` as a Lean file, or `{"error": ...}` if `A` doesn't parse: letters are sentence letters,
-`¬ □ ◇ ⊡` bind tightest, then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read
+`A` as a Lean file, or `{"error": ...}` if `A` doesn't parse: words of Latin or Greek letters
+are sentence letters, `¬ □ ◇ ⊡` bind tightest, then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read
 as `¬⊥` and `⊡A` as `A ∧ □A`. `{"lean": source}` is answered with `{"output": ...,
 "errors": ...}`: what the `#eval`s of the Lean file `source` print, and Lean's errors, with
 the file's own `import`s ignored in favour of `GLTableau`, loaded once, when the server
 starts; each request then takes a fraction of a second. So the tableau in a file `t.lean` is
 printed as a `prooftree` of the `prooftrees` LaTeX package by sending the file with
-`#eval IO.print t.tex` added.
+`#eval IO.print t.tex` added; Greek sentence letters are printed as they are, and the wrapper
+turns them into LaTeX commands.
 
     $ echo '{"sentence": "□(□p → p) → □p"}' | lake exe tableau
     {"closed":true,"lean":"import GLTableau\n\n/-- □(□p → p) → □p is a theorem of GL -/\ndef t : Tableau where ..."}
