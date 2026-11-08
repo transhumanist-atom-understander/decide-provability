@@ -1,11 +1,12 @@
 name = "decide-provability"
-defaultTargets = ["GLTableau", "tableau"]
+defaultTargets = ["GLTableau"]
 
 [[lean_lib]]
 name = "GLTableau"
 
-# The server imports `GLTableau` at run time, into the environment it elaborates requests in.
-[[lean_exe]]
-name = "tableau"
-root = "Main"
-supportInterpreter = true
+# The Lean REPL that the Python package `lean-interact` drives, at the tag for this toolchain:
+# the wrapper runs it in this project, with `GLTableau` imported.
+[[require]]
+name = "REPL"
+git = "https://github.com/augustepoiroux/repl"
+rev = "v1.3.19_lean-toolchain-v4.35.0"

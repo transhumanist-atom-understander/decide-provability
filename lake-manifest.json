@@ -1,6 +1,16 @@
-{"version": "1.2.0",
+{"version": "1.3.0",
  "packagesDir": ".lake/packages",
- "packages": [],
+ "packages":
+ [{"url": "https://github.com/augustepoiroux/repl",
+   "type": "git",
+   "subDir": null,
+   "scope": "",
+   "rev": "e293e5f752b7a06c13746801b59621dcb497cd46",
+   "name": "REPL",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "v1.3.19_lean-toolchain-v4.35.0",
+   "inherited": false,
+   "configFile": "lakefile.toml"}],
  "name": "«decide-provability»",
  "lakeDir": ".lake",
  "fixedToolchain": false}
