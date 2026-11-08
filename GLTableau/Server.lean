@@ -1,5 +1,5 @@
 import Lean
-import GLTableau.Tableau
+import GLTableau
 
 /-!
 # The server
@@ -7,7 +7,8 @@ import GLTableau.Tableau
 `Tableau.serve` is the loop behind the executable `tableau` of this project and `verify` of
 `verify-provability`: it answers requests read from stdin with the Lean modules it was given
 imported once, at the start. It is not part of `GLTableau` itself, which the Lean files of
-tableaux import, so that they see no more of Lean than they need.
+tableaux import, so that they see no more of Lean than they need; but it imports `GLTableau`,
+so that building an executable that runs it builds the library it loads.
 -/
 
 open Lean
