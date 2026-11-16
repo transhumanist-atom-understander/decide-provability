@@ -27,7 +27,14 @@ then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read as
 `(□p ≺ □q) ∧ r`, and `¬□p ≺ □q` doesn't parse, but `¬(□p ≺ □q)` does. That file, with
 `#eval IO.print t.tex` added, prints the tableau as a `prooftree` of the `prooftrees` LaTeX
 package; sentence letters are printed as they are, and the wrapper turns Greek letters and other
-such characters into LaTeX commands. The REPL is required at the tag for this project's
+such characters into LaTeX commands. With `#eval IO.print (t.modelTex.getD "")` it prints the
+model that the first open branch describes, as a `tikzpicture` for a document with the packages
+`tikz` and `amssymb`, or nothing if the tableau closed: the worlds as a tree, an arrow from each
+to the worlds that the rules for `¬□` and `◇` started from it, which stands for the transitive
+order that generates, and by each world what the branch says there of the sentence letters and
+the comparisons. Of a sentence of GL that is a countermodel, however the letters a world says
+nothing of are valued there; of a sentence with comparisons it is a model of the rules here,
+and not always one of R⁻. The REPL is required at the tag for this project's
 toolchain, so the two move together.
 
     $ lake env .lake/packages/REPL/.lake/build/bin/repl
@@ -134,6 +141,6 @@ the tableau with the four axioms as premises has 9,500 branches and 26,000 lines
 ## Files
 
 - `RTableau/Formula.lean`: formulas, their parser, and their LaTeX and Lean printers.
-- `RTableau/Tableau.lean`: lines, the tree a tableau builds, the rules, the procedure, and the
-  `Tableau` a Lean file defines.
+- `RTableau/Tableau.lean`: lines, the tree a tableau builds, the rules, the procedure, the drawing of
+  an open branch's model, and the `Tableau` a Lean file defines.
 - `RTableau.lean`: the library, the two modules above.

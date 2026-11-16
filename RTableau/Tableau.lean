@@ -87,6 +87,67 @@ where
 
 end Tree
 
+-- The Kripke model that a branch describes, drawn: its worlds as a tree, each with what the
+-- branch says there of the sentence letters and the comparisons.
+namespace Model
+
+/-- What the `branch` says at world `i` of a sentence letter or a comparison: that it holds or
+that it doesn't, in the order of the branch. -/
+def facts (branch : List Line) (i : Nat) : List Formula :=
+  (branch.filterMap fun
+    | .fml k A =>
+      match A with
+      | .atom _ | ∼(.atom _) | □_ ≺ □_ | □_ ≼ □_ | ∼(□_ ≺ □_) | ∼(□_ ≼ □_) => if k = i then some A else none
+      | _ => none
+    | _ => none).eraseDups
+
+/-- The worlds that the rules for `¬□` and `◇` started from world `i`. The other worlds that
+see one of them are older than `i`: they are those that see `i`, by transitivity. -/
+def started (branch : List Line) (i : Nat) : List Nat :=
+  branch.filterMap fun
+    | .rel k j => if k = i && branch.all (fun | .rel m n => n ≠ j || m ≤ i | _ => true) then some j else none
+    | _ => none
+
+/-- The width in mm to leave for what is written to the right of world `i`: 3 for each
+character of the facts, and 5 for the `⊩`. -/
+def width (branch : List Line) (i : Nat) : Int :=
+  match facts branch i with
+  | [] => 0
+  | fs => 5 + 3 * (", ".intercalate (fs.map toString)).length
+
+/-- Where the worlds below `i`, and `i`, go: each with how far right of `i` it is, in mm, and
+how many steps down from the first world, `i` being `depth` steps down; and how far the drawing
+of them reaches to the left and to the right of `i`. A world is midway above the first and last
+of the worlds it started, which are side by side, far enough apart that what is drawn below one
+and written to its right is clear of the next. -/
+partial def layout (branch : List Line) (i depth : Nat) : List (Nat × Int × Nat) × Int × Int :=
+  /- Each subtree with where its top world is, the first one's left edge being at 0. -/
+  let (subs, _) := ((started branch i).map (layout branch · (depth + 1))).foldl
+    (fun (subs, edge) (ws, l, r) => (subs ++ [(edge - l, ws, l, r)], edge - l + r + 4)) ([], 0)
+  let mid := match subs.head?, subs.getLast? with
+    | some (a, _), some (b, _) => (a + b) / 2
+    | _, _ => 0
+  ((i, 0, depth) :: subs.flatMap fun (x, ws, _, _) => ws.map fun (w, dx, d) => (w, dx + x - mid, d),
+    subs.foldl (fun m (x, _, l, _) => min m (x + l - mid)) (-3),
+    subs.foldl (fun m (x, _, _, r) => max m (x + r - mid)) (3 + width branch i))
+
+/-- The model as a `tikzpicture`, which needs the LaTeX packages `tikz` and `amssymb`: an arrow
+from each world to the worlds it started, the others that it sees being those further down. -/
+def tex (branch : List Line) : String :=
+  let worlds := (layout branch 0 0).1
+  let node := fun ((i, x, d) : Nat × Int × Nat) =>
+    s!"  \\node[inner sep=2pt] (w{i}) at ({x}mm,{-12 * (d : Int)}mm) \{$w_\{{i}}$};\n"
+  let fact := fun ((i, _, _) : Nat × Int × Nat) =>
+    match facts branch i with
+    | [] => ""
+    | fs => s!"  \\node[anchor=west, inner sep=0pt] at (w{i}.east) \{$\\,\\Vdash {", ".intercalate (fs.map (·.render .tex))}$};\n"
+  let arrows := fun ((i, _, _) : Nat × Int × Nat) =>
+    "".intercalate ((started branch i).map fun j => s!"  \\draw[->] (w{i}) -- (w{j});\n")
+  "\\begin{tikzpicture}[>=stealth]\n" ++ "".intercalate (worlds.map node ++ worlds.map fact ++ worlds.map arrows)
+    ++ "\\end{tikzpicture}\n"
+
+end Model
+
 /-- A world `i` where `A, i` and `¬A, i`, or `⊥, i`, are on the branch. -/
 def clash (branch : List Line) : Option (Nat × Formula) :=
   branch.findSome? fun
@@ -186,6 +247,14 @@ def of (A : Formula) : Tableau := ⟨A, expand [.fml 0 ∼A] [.fml 0 ∼A]⟩
 def tex (t : Tableau) : String :=
   "\\begin{prooftree}{not line numbering}" ++ Tree.chain [.fml 0 ∼t.sentence] 1 (t.tree.tex 2)
     ++ "\n\\end{prooftree}\n"
+
+/-- The model that the tableau's first open branch describes, as a `tikzpicture`, or nothing
+if the tableau closed. Of a sentence of GL it is a countermodel: a finite tree, read as the
+transitive order it generates, at whose first world the sentence fails, however the letters the
+branch doesn't speak of at a world are valued there. Of a sentence with comparisons it is a model
+of what the rules say of them, and not always one of R⁻. -/
+def modelTex (t : Tableau) : Option String :=
+  (fun branch => Model.tex (.fml 0 ∼t.sentence :: branch)) <$> t.tree.openBranch
 
 /-- What the tableau shows. A closed tableau is a proof in R⁻, and in GL if the sentence is
 GL's. An open one refutes a sentence of GL, for which the rules are GL's and complete; for a
