@@ -109,11 +109,11 @@ def started (branch : List Line) (i : Nat) : List Nat :=
     | _ => none
 
 /-- The width in mm to leave for what is written to the right of world `i`: 3 for each
-character of the facts, and 5 for the `⊩`. -/
+character of the facts, and 8 for the `⊩`. -/
 def width (branch : List Line) (i : Nat) : Int :=
   match facts branch i with
   | [] => 0
-  | fs => 5 + 3 * (", ".intercalate (fs.map toString)).length
+  | fs => 8 + 3 * (", ".intercalate (fs.map toString)).length
 
 /-- Where the worlds below `i`, and `i`, go: each with how far right of `i` it is, in mm, and
 how many steps down from the first world, `i` being `depth` steps down; and how far the drawing
@@ -123,13 +123,13 @@ and written to its right is clear of the next. -/
 partial def layout (branch : List Line) (i depth : Nat) : List (Nat × Int × Nat) × Int × Int :=
   /- Each subtree with where its top world is, the first one's left edge being at 0. -/
   let (subs, _) := ((started branch i).map (layout branch · (depth + 1))).foldl
-    (fun (subs, edge) (ws, l, r) => (subs ++ [(edge - l, ws, l, r)], edge - l + r + 4)) ([], 0)
+    (fun (subs, edge) (ws, l, r) => (subs ++ [(edge - l, ws, l, r)], edge - l + r + 5)) ([], 0)
   let mid := match subs.head?, subs.getLast? with
     | some (a, _), some (b, _) => (a + b) / 2
     | _, _ => 0
   ((i, 0, depth) :: subs.flatMap fun (x, ws, _, _) => ws.map fun (w, dx, d) => (w, dx + x - mid, d),
-    subs.foldl (fun m (x, _, l, _) => min m (x + l - mid)) (-3),
-    subs.foldl (fun m (x, _, _, r) => max m (x + r - mid)) (3 + width branch i))
+    subs.foldl (fun m (x, _, l, _) => min m (x + l - mid)) (-4),
+    subs.foldl (fun m (x, _, _, r) => max m (x + r - mid)) (4 + width branch i))
 
 /-- The model as a `tikzpicture`, which needs the LaTeX packages `tikz` and `amssymb`: an arrow
 from each world to the worlds it started, the others that it sees being those further down. -/
@@ -142,7 +142,7 @@ def tex (branch : List Line) : String :=
     | [] => ""
     | fs => s!"  \\node[anchor=west, inner sep=0pt] at (w{i}.east) \{$\\,\\Vdash {", ".intercalate (fs.map (·.render .tex))}$};\n"
   let arrows := fun ((i, _, _) : Nat × Int × Nat) =>
-    "".intercalate ((started branch i).map fun j => s!"  \\draw[->] (w{i}) -- (w{j});\n")
+    "".intercalate ((started branch i).map fun j => s!"  \\draw[->] (w{i}.south) -- (w{j}.north);\n")
   "\\begin{tikzpicture}[>=stealth]\n" ++ "".intercalate (worlds.map node ++ worlds.map fact ++ worlds.map arrows)
     ++ "\\end{tikzpicture}\n"
 
