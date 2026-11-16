@@ -1,9 +1,9 @@
 import Std.Internal.Parsec
 
-namespace Witness.Tableau
+namespace Tableau
 
-/-- A formula of GL with witness comparisons, the language of Guaspari and Solovay's R⁻: a formula
-of GL, or a witness comparison of two boxed formulas. -/
+/-- A formula of Guaspari and Solovay's R⁻: GL's, with every connective Priest's tableau rules
+speak about, and the witness comparisons of two boxed formulas. -/
 inductive Formula
   | atom (name : String)
   | bot
@@ -22,8 +22,9 @@ inductive Formula
 
 instance : Coe String Formula := ⟨.atom⟩
 
--- The symbols of `GLTableau` for the connectives, with the witness comparisons, which are
--- written with the boxes of the formulas they compare.
+-- Symbols for the connectives, for the tableau's own code: the `.lean` files of tableaux name
+-- the constructors instead. The witness comparisons are written with the boxes of the formulas
+-- they compare.
 namespace Notation
 scoped notation:max "⊥" => Formula.bot
 scoped prefix:max "∼" => Formula.neg
@@ -42,8 +43,10 @@ open Notation
 namespace Formula
 
 open Std.Internal.Parsec String in
-/-- The sentences of `GLTableau`, with `□A ≺ □B` and `□A ≼ □B`, which bind tighter than `∧` and
-looser than `¬ □ ◇ ⊡`, so that what they compare must be written as boxed formulas. -/
+/-- A sentence letter is any run of characters other than whitespace, parentheses and the
+connectives; `¬ □ ◇ ⊡` bind tightest, then `≺` and `≼`, so that what they compare must be
+written as boxed formulas, then `∧`, `∨`, `→`, `↔`, each associating to the right; `⊤` is `¬⊥`
+and `⊡A` is `A ∧ □A`. -/
 partial def parse (s : String) : Except String Formula := (ws *> formula <* eof).run s
 where
   formula : Parser Formula := binary [("↔", iff), ("→", imp), ("∨", or), ("∧", and)]
@@ -119,6 +122,13 @@ protected def repr : Formula → String
 
 instance : Repr Formula := ⟨fun A _ => A.repr⟩
 
+/-- Whether `A` is a formula of GL: it has no witness comparison. -/
+def isGL : Formula → Bool
+  | atom _ | ⊥ => true
+  | ∼A | □A | ◇A => A.isGL
+  | A ⋏ B | A ⋎ B | A 🡒 B | A 🡘 B => A.isGL && B.isGL
+  | □_ ≺ □_ | □_ ≼ □_ => false
+
 end Formula
 
-end Witness.Tableau
+end Tableau

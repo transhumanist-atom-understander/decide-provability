@@ -1,14 +1,11 @@
 name = "decide-provability"
-defaultTargets = ["GLTableau", "WitnessTableau"]
+defaultTargets = ["RTableau"]
 
 [[lean_lib]]
-name = "GLTableau"
-
-[[lean_lib]]
-name = "WitnessTableau"
+name = "RTableau"
 
 # The Lean REPL that the Python package `lean-interact` drives, at the tag for this toolchain:
-# the wrapper runs it in this project, with one of the libraries imported.
+# the wrapper runs it in this project, with `RTableau` imported.
 [[require]]
 name = "REPL"
 git = "https://github.com/augustepoiroux/repl"

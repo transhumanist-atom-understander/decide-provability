@@ -1,6 +1,6 @@
-import WitnessTableau.Formula
+import RTableau.Formula
 
-namespace Witness.Tableau
+namespace Tableau
 
 open Notation
 
@@ -114,10 +114,10 @@ where a comparison says so: the lines `□A → □B, k` that aren't settled, ea
 def noLater (branch : List Line) (ks : List Nat) (A B : Formula) : List Line :=
   ((ks.filter (!settled branch · A B)).mergeSort (· ≤ ·)).map (.fml · (□A 🡒 □B))
 
-/-- The rules of `GLTableau`, and the rules for witness comparisons, none of which branch: the
-tree below `l`, given what's below the new lines of a branch; `none` when no rule applies. A
-rule with two premises is applied to each, which looks for the other, so whichever comes second
-finds the first. -/
+/-- Priest's rules, with the GL rule for `¬□`, the matching rule for `◇`, and transitivity, and
+the rules for witness comparisons, none of which branch: the tree below `l`, given what's below
+the new lines of a branch; `none` when no rule applies. A rule with two premises is applied to
+each, which looks for the other, so whichever comes second finds the first. -/
 def rule (l : Line) (branch : List Line) (below : List Line → Tree) : Option Tree :=
   let one new := some (Tree.step l new (below new))
   let two n₁ n₂ := some (Tree.split l n₁ (below n₁) n₂ (below n₂))
@@ -170,14 +170,14 @@ partial def expand (branch todo : List Line) : Tree :=
     | some t => t
     | none => expand branch todo
 
-end Witness.Tableau
+end Tableau
 
 /-- A tableau for `sentence`: what the procedure builds below `¬sentence, 0`. -/
-structure Witness.Tableau where
-  sentence : Witness.Tableau.Formula
-  tree : Witness.Tableau.Tree
+structure Tableau where
+  sentence : Tableau.Formula
+  tree : Tableau.Tree
 
-namespace Witness.Tableau
+namespace Tableau
 
 open Notation
 
@@ -187,20 +187,24 @@ def tex (t : Tableau) : String :=
   "\\begin{prooftree}{not line numbering}" ++ Tree.chain [.fml 0 ∼t.sentence] 1 (t.tree.tex 2)
     ++ "\n\\end{prooftree}\n"
 
-/-- What the tableau shows. A closed tableau is a proof in R⁻; an open one only shows that the
-rules here, which leave out how R⁻ orders boxed formulas that come to hold together, are not
-enough. -/
+/-- What the tableau shows. A closed tableau is a proof in R⁻, and in GL if the sentence is
+GL's. An open one refutes a sentence of GL, for which the rules are GL's and complete; for a
+sentence with comparisons it only shows that the rules here, which leave out how R⁻ orders
+boxed formulas that come to hold together, are not enough. -/
 def claim (t : Tableau) : String :=
-  if t.tree.isClosed then s!"{t.sentence} is a theorem of R⁻"
-  else s!"{t.sentence} does not follow from persistence and true before false"
+  match t.tree.isClosed, t.sentence.isGL with
+  | true, true => s!"{t.sentence} is a theorem of GL"
+  | true, false => s!"{t.sentence} is a theorem of R⁻"
+  | false, true => s!"{t.sentence} is not a theorem of GL"
+  | false, false => s!"{t.sentence} does not follow from persistence and true before false"
 
-/-- `t` as a Lean file defining it as `t`, to print. -/
+/-- `t` as a Lean file defining it as `t`. -/
 def lean (t : Tableau) : String :=
-  s!"import WitnessTableau\n\n/-- {t.claim} -/\ndef t : Witness.Tableau where\n  sentence := {t.sentence.repr}\n  tree :={t.tree.repr 2}\n"
+  s!"import RTableau\n\n/-- {t.claim} -/\ndef t : Tableau where\n  sentence := {t.sentence.repr}\n  tree :={t.tree.repr 2}\n"
 
 /-- Prints the tableau for the sentence `s` as a Lean file, or fails with `s`'s parse error:
 what the wrapper has Lean evaluate to decide a sentence. -/
 def decide (s : String) : IO Unit := do
   IO.print (of (← IO.ofExcept (Formula.parse s))).lean
 
-end Witness.Tableau
+end Tableau
