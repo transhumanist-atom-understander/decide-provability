@@ -9,10 +9,6 @@ uses; use it from there. It depends on nothing but Lean and the
 
     $ lake build
 
-Having Lean check what a tableau shows is the separate project
-[verify-provability](https://github.com/transhumanist-atom-understander/verify-provability),
-which depends on this one and on `ProvabilityLogic`, hence Mathlib.
-
 The wrapper runs the REPL in this project, with `GLTableau` imported once, and has it
 evaluate Lean. `#eval Tableau.decide A` prints the tableau for the sentence `A` as a Lean
 file, defining it as `t`, or fails with `A`'s parse error: a sentence letter is any run of
