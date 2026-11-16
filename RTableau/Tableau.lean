@@ -108,12 +108,28 @@ def started (branch : List Line) (i : Nat) : List Nat :=
     | .rel k j => if k = i && branch.all (fun | .rel m n => n ≠ j || m ≤ i | _ => true) then some j else none
     | _ => none
 
-/-- The width in mm to leave for what is written to the right of world `i`: 3 for each
-character of the facts, and 8 for the `⊩`. -/
+/-- The comparisons that the `branch` speaks of, in its order. A drawing names them `c₁`, `c₂`
+and so on, since they are long, and what is written by a world is what sets the worlds apart. -/
+def comparisons (branch : List Line) : List Formula :=
+  (branch.filterMap fun
+    | .fml _ (∼(□A ≺ □B)) | .fml _ (□A ≺ □B) => some (□A ≺ □B)
+    | .fml _ (∼(□A ≼ □B)) | .fml _ (□A ≼ □B) => some (□A ≼ □B)
+    | _ => none).eraseDups
+
+/-- A fact in the style `s`, with the name of a comparison in place of it: in LaTeX if `tex`. -/
+def fact (branch : List Line) (s : Formula.Style) (tex : Bool) : Formula → String
+  | ∼A => s.neg ++ fact branch s tex A
+  | A =>
+    match (comparisons branch).idxOf? A with
+    | some n => if tex then s!"c_\{{n + 1}}" else s!"c{n + 1}"
+    | none => A.render s
+
+/-- The width in mm to leave for what is written to the right of world `i`: 2 for each
+character of the facts, and 7 for the `⊩`. -/
 def width (branch : List Line) (i : Nat) : Int :=
   match facts branch i with
   | [] => 0
-  | fs => 8 + 3 * (", ".intercalate (fs.map toString)).length
+  | fs => 7 + 2 * (", ".intercalate (fs.map (fact branch .unicode false))).length
 
 /-- Where the worlds below `i`, and `i`, go: each with how far right of `i` it is, in mm, and
 how many steps down from the first world, `i` being `depth` steps down; and how far the drawing
@@ -132,18 +148,22 @@ partial def layout (branch : List Line) (i depth : Nat) : List (Nat × Int × Na
     subs.foldl (fun m (x, _, _, r) => max m (x + r - mid)) (4 + width branch i))
 
 /-- The model as a `tikzpicture`, which needs the LaTeX packages `tikz` and `amssymb`: an arrow
-from each world to the worlds it started, the others that it sees being those further down. -/
+from each world to the worlds it started, the others that it sees being those further down, and
+below them what the names of the comparisons stand for. -/
 def tex (branch : List Line) : String :=
-  let worlds := (layout branch 0 0).1
+  let (worlds, left, right) := layout branch 0 0
   let node := fun ((i, x, d) : Nat × Int × Nat) =>
     s!"  \\node[inner sep=2pt] (w{i}) at ({x}mm,{-12 * (d : Int)}mm) \{$w_\{{i}}$};\n"
-  let fact := fun ((i, _, _) : Nat × Int × Nat) =>
+  let says := fun ((i, _, _) : Nat × Int × Nat) =>
     match facts branch i with
     | [] => ""
-    | fs => s!"  \\node[anchor=west, inner sep=0pt] at (w{i}.east) \{$\\,\\Vdash {", ".intercalate (fs.map (·.render .tex))}$};\n"
+    | fs => s!"  \\node[anchor=west, inner sep=0pt] at (w{i}.east) \{$\\,\\Vdash {", ".intercalate (fs.map (fact branch .tex true))}$};\n"
   let arrows := fun ((i, _, _) : Nat × Int × Nat) =>
     "".intercalate ((started branch i).map fun j => s!"  \\draw[->] (w{i}.south) -- (w{j}.north);\n")
-  "\\begin{tikzpicture}[>=stealth]\n" ++ "".intercalate (worlds.map node ++ worlds.map fact ++ worlds.map arrows)
+  let depth := (worlds.map (·.2.2)).max?.getD 0
+  let key := (comparisons branch).zipIdx.map fun (c, n) =>
+    s!"  \\node[inner sep=0pt] at ({(left + right) / 2}mm,{-12 * (depth : Int) - 10 - 7 * (n : Int)}mm) \{${fact branch .tex true c} = {c.render .tex}$};\n"
+  "\\begin{tikzpicture}[>=stealth]\n" ++ "".intercalate (worlds.map node ++ worlds.map says ++ worlds.map arrows ++ key)
     ++ "\\end{tikzpicture}\n"
 
 end Model

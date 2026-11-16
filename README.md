@@ -32,7 +32,8 @@ model that the first open branch describes, as a `tikzpicture` for a document wi
 `tikz` and `amssymb`, or nothing if the tableau closed: the worlds as a tree, an arrow from each
 to the worlds that the rules for `¬□` and `◇` started from it, which stands for the transitive
 order that generates, and by each world what the branch says there of the sentence letters and
-the comparisons. Of a sentence of GL that is a countermodel, however the letters a world says
+the comparisons, which are named `c₁`, `c₂` and so on there and spelled out below the worlds,
+to keep the drawing narrow. Of a sentence of GL that is a countermodel, however the letters a world says
 nothing of are valued there; of a sentence with comparisons it is a model of the rules here,
 and not always one of R⁻. The REPL is required at the tag for this project's
 toolchain, so the two move together.
