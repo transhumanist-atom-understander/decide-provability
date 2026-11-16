@@ -27,14 +27,15 @@ then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read as
 `(□p ≺ □q) ∧ r`, and `¬□p ≺ □q` doesn't parse, but `¬(□p ≺ □q)` does. That file, with
 `#eval IO.print t.tex` added, prints the tableau as a `prooftree` of the `prooftrees` LaTeX
 package; sentence letters are printed as they are, and the wrapper turns Greek letters and other
-such characters into LaTeX commands. With `#eval IO.print (t.modelTex.getD "")` it prints the
-model that the first open branch describes, as a `tikzpicture` for a document with the packages
-`tikz` and `amssymb`, or nothing if the tableau closed: the worlds as a tree, an arrow from each
+such characters into LaTeX commands. With `#eval IO.print ("\n".intercalate t.modelsTex)` it prints the
+models that the open branches describe, from left to right and one for branches that are drawn
+the same, each as a `tikzpicture` for a document with the packages `tikz` and `amssymb`, with a
+blank line between them, or nothing if the tableau closed. A model is drawn with its worlds as a tree, an arrow from each
 to the worlds that the rules for `¬□` and `◇` started from it, which stands for the transitive
 order that generates, and by each world what the branch says there of the sentence letters and
 the comparisons, which are named `c₁`, `c₂` and so on there and spelled out below the worlds,
-to keep the drawing narrow. Of a sentence of GL that is a countermodel, however the letters a world says
-nothing of are valued there; of a sentence with comparisons it is a model of the rules here,
+to keep the drawing narrow. Of a sentence of GL each is a countermodel, however the letters a world says
+nothing of are valued there; of a sentence with comparisons each is a model of the rules here,
 and not always one of R⁻. The REPL is required at the tag for this project's
 toolchain, so the two move together.
 

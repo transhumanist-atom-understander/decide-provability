@@ -54,12 +54,13 @@ def isClosed : Tree → Bool
   | closed .. => true
   | exhausted => false
 
-/-- The lines below the root of the first open branch, oldest first. -/
-def openBranch : Tree → Option (List Line)
-  | step _ new t => (new ++ ·) <$> t.openBranch
-  | split _ n₁ t₁ n₂ t₂ => ((n₁ ++ ·) <$> t₁.openBranch) <|> ((n₂ ++ ·) <$> t₂.openBranch)
-  | closed .. => none
-  | exhausted => some []
+/-- The lines below the root of each open branch, oldest first, the branches from left to
+right. -/
+def openBranches : Tree → List (List Line)
+  | step _ new t => t.openBranches.map (new ++ ·)
+  | split _ n₁ t₁ n₂ t₂ => t₁.openBranches.map (n₁ ++ ·) ++ t₂.openBranches.map (n₂ ++ ·)
+  | closed .. => []
+  | exhausted => [[]]
 
 /-- The lines `ls` as nodes of a `prooftree` of the `prooftrees` LaTeX package, each nested in
 the one above at depth `d` on, with `rest` inside the last. -/
@@ -268,13 +269,14 @@ def tex (t : Tableau) : String :=
   "\\begin{prooftree}{not line numbering}" ++ Tree.chain [.fml 0 ∼t.sentence] 1 (t.tree.tex 2)
     ++ "\n\\end{prooftree}\n"
 
-/-- The model that the tableau's first open branch describes, as a `tikzpicture`, or nothing
-if the tableau closed. Of a sentence of GL it is a countermodel: a finite tree, read as the
-transitive order it generates, at whose first world the sentence fails, however the letters the
-branch doesn't speak of at a world are valued there. Of a sentence with comparisons it is a model
-of what the rules say of them, and not always one of R⁻. -/
-def modelTex (t : Tableau) : Option String :=
-  (fun branch => Model.tex (.fml 0 ∼t.sentence :: branch)) <$> t.tree.openBranch
+/-- The models that the tableau's open branches describe, each as a `tikzpicture`, the branches
+from left to right: none if the tableau closed, and one for branches that are drawn the same.
+Of a sentence of GL each is a countermodel: a finite tree, read as the transitive order it
+generates, at whose first world the sentence fails, however the letters the branch doesn't
+speak of at a world are valued there. Of a sentence with comparisons each is a model of what
+the rules say of them, and not always one of R⁻. -/
+def modelsTex (t : Tableau) : List String :=
+  (t.tree.openBranches.map fun branch => Model.tex (.fml 0 ∼t.sentence :: branch)).eraseDups
 
 /-- What the tableau shows. A closed tableau is a proof in R⁻, and in GL if the sentence is
 GL's. An open one refutes a sentence of GL, for which the rules are GL's and complete; for a
