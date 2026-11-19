@@ -11,12 +11,10 @@ use it from there. It depends on nothing but Lean and the
 
     $ lake build
 
-The rules for comparisons are not all of R⁻ yet: they are in place of two of its axioms, that a
-comparison persists and that true comes before false. So a tableau that closes shows a theorem
-of R⁻, and one that doesn't shows only that these rules are not enough, [as set out
-below](#what-they-prove). A sentence of GL, one with no comparison, is the special case that is
-decided: the rules that apply to it are GL's, so its tableau closes if it is a theorem of GL and
-doesn't if it is not.
+The rules for comparisons are complete for R⁻, [as set out below](#why-they-are-complete): a
+tableau closes if its sentence is a theorem of R⁻ and doesn't if it is not, and then each open
+branch describes a countermodel. For a sentence of GL, one with no comparison, the rules that
+apply are GL's, so its tableau closes if it is a theorem of GL and doesn't if it is not.
 
 The wrapper runs the REPL in this project, with `RTableau` imported once, and has it evaluate
 Lean. `#eval Tableau.decide A` prints the tableau for the sentence `A` as a Lean file, defining
@@ -34,9 +32,9 @@ blank line between them, or nothing if the tableau closed. A model is drawn with
 to the worlds that the rules for `¬□` and `◇` started from it, which stands for the transitive
 order that generates, and by each world what the branch says there of the sentence letters and
 the comparisons, which are named `c₁`, `c₂` and so on there and spelled out below the worlds,
-to keep the drawing narrow. Of a sentence of GL each is a countermodel, however the letters a world says
-nothing of are valued there; of a sentence with comparisons each is a model of the rules here,
-and not always one of R⁻. The REPL is required at the tag for this project's
+to keep the drawing narrow. Each is a countermodel, however the letters a world says nothing of
+are valued there; the comparisons it says nothing of are then settled by how the boxed formulas
+came to hold on the way down to it, [as below](#why-they-are-complete). The REPL is required at the tag for this project's
 toolchain, so the two move together.
 
     $ lake env .lake/packages/REPL/.lake/build/bin/repl
@@ -49,8 +47,7 @@ toolchain, so the two move together.
     {"messages": [{"severity": "info", "data": "import RTableau\n\n/-- □(□¬⊥ ≺ □⊥) is a theorem of R⁻ -/\ndef t : Tableau where ..."}], "env": 1}
 
 The file says what its tableau shows: that the sentence is a theorem of R⁻, or of GL if it has
-no comparison; that it is not a theorem of GL; or, of a sentence with comparisons whose tableau
-doesn't close, that it does not follow from persistence and true before false.
+no comparison; or that it is not a theorem of R⁻, or of GL.
 
 ## The tableau
 
@@ -66,6 +63,11 @@ their negations, with these modal rules:
 The rule for `¬□` is Priest's rule for `◇¬`, with the `□A, j` that makes it GL's, so Löb's
 theorem goes through, and the rule for `◇` likewise. Transitivity is Priest's rule for K4.
 The branch closes on `A, i` and `¬A, i`, or on `⊥, i`.
+
+An implication between boxed formulas, `□A → □B, i`, is not split where the branch has settled
+it: where `□B` is on the branch at `i` or at a world that sees `i`, or `¬□A` at `i` or at a
+world `i` sees, or `A` is `B`. That changes the tableau and not what it shows: an implication
+the branch has settled is true in the model an open branch describes.
 
 Each line is expanded once; a rule with two premises is applied to each, which looks for the
 other, so whichever comes second finds the first. Lines are expanded in order of appearance,
@@ -86,59 +88,73 @@ false,
 
 ### The rules
 
-The tableau has these rules for them, where `c` is `□A ≺ □B` or `□A ≼ □B`:
+The tableau has these rules for them, where `c` is `□A ≺ □B` or `□A ≼ □B`, and `c̄` is its
+converse, `□B ≼ □A` or `□B ≺ □A`:
 
-    c, i   irj     ⟹  c, j              persistence
-    ¬c, j  irj     ⟹  □A → □B, i        true before false; also for i = j
-    c, i           ⟹  □A, i             the first is true
-    c, j   irj     ⟹  □B → □A, i        false is not before true
+    c, i   irj     ⟹  c, j                    persistence
+    c, i           ⟹  □A, i                   the first is true
+    ¬c, i          ⟹  ¬□A, i  |  c̄, i         a comparison that fails
+    c, j   irj     ⟹  c ∨ ¬□B, i              where it started; i the world that started j
 
-None of them branches. The second is the axiom: had `□A` held at `i` without `□B`, `c` would
-have held there, and at `j` since it persists. So `¬c, j` says, of `j` and of every world that
-sees it, what the axiom's contrapositive says of one world, and that is all of the axiom that a
-tableau can use, since the comparison it concludes can only clash with its negation, at that
-world or a later one. It is in this form, as a line to split, that the axiom is a premise of a
-tableau drawn by hand; the rule adds it only where a comparison has failed, and without its
-third branch, `c, i`, which would close. The fourth is its mirror image, for a comparison that
-holds: had `□B` held at `i` without `□A`, the opposite comparison would have held at `i`, and
-at `j`. Both say that a boxed formula came to hold *no later* than another on the way down to
-`j`, which is what a comparison can say about boxed formulas that didn't come to hold together.
+and a branch also closes on a circle of comparisons at a world, one of them strict:
 
-The implications are split by the rule for `→`, as `¬□A, i` and `□B, i`. One is not split where
-the branch has settled it: where `□B` is on the branch at `i` or at a world that sees `i`, or
-`¬□A` at `i` or at a world `i` sees, or `A` is `B`. That is the only change to GL's rules, and
-it keeps a comparison at a world `n` steps down from costing more than `n + 2` branches. It
-holds of any implication between boxed formulas, a sentence of GL's too, where it changes the
-tableau and not what it shows: an implication the branch has settled is true in the model an
-open branch describes.
+    □A₁ ≺ □A₂, i   □A₂ ≼ □A₃, i   ...   □Aₙ ≼ □A₁, i        each ≼ or ≺
 
-### What they prove
+The third is how a comparison fails: `□A` is not witnessed, or it is, and then `□B` is witnessed
+no later, or earlier, which is the converse comparison. So a comparison that fails is traded for
+one that holds, and the rules need only say what it is for a comparison to hold. The converse,
+and the disjunction of the fourth rule, are the formulas a tableau has that are not subformulas
+of its sentence.
 
-The tableau for a sentence closes exactly when GL proves it from these axioms, for each
-comparison `c` in it, with `c` read as a sentence letter and each axiom taken at the first
-world and at the worlds it sees, as `⊡` of it:
+The fourth says where a comparison that holds came to hold. If `c` holds at `j` and not at the
+world `i` that started `j`, then `□B` doesn't hold at `i`: had it held there, without `c`, the
+converse of `c` would have held at `i`, by the third rule, and at `j`, since it persists. The
+rule adds the disjunction as a line, for the rule for `∨` to split, and neither adds nor splits
+it where the branch has settled it: where `c` is on the branch at `i` or at a world that sees
+`i`, or `¬□B` at `i` or at a world `i` sees. The third rule likewise doesn't split where `¬□A`
+is on the branch at `i` or at a world `i` sees, or `c̄` at `i` or at a world that sees `i`.
 
-    c → □c                     (□A ∧ ¬□B) → c
-    c → □A                     (□B ∧ ¬□A) → □¬c
+A circle is what no order satisfies: `≼` is a preorder of the boxed formulas that hold, and `≺`
+is its strict part. `□A ≺ □A` is a circle, and so are `c` and `c̄`, but a circle can be any
+length, `¬(□p ≺ □q ∧ □q ≺ □r ∧ □r ≺ □p)` being a theorem. The check is of the comparisons on
+the branch at one world, as the edges of a graph of the boxed formulas they compare: it needs
+no comparison that the other rules didn't put there.
 
-They are theorems of R⁻, so a tableau that closes shows a theorem of R⁻. A tableau that
-doesn't close shows only that these axioms are not enough, and its file says so: R⁻ also has
-the axioms that make `≼` a total preorder of the boxed formulas that hold, with `≺` its strict
-part, and those matter for boxed formulas that come to hold at the same world, of which the
-rules here say nothing. So `□p ≺ □q → ¬(□q ≺ □p)` and `□p ≺ □q → □p ≼ □q` are not proved, nor
-is `¬(□p ≺ □q) ∧ □q → □¬(□p ≺ □q)`. For a sentence with no comparison there are no such axioms,
-and the tableau decides whether GL proves it.
+### Why they are complete
 
-In a model, the rules say that the comparisons that hold at a world lie between two orders of
-the boxed formulas, both read off the path down to it: every boxed formula that held at a world
-where another didn't is before it, and no boxed formula is before one that held at a world
-where it didn't. These are `<` and `≤` of de Jongh's *A simplification of a completeness proof
-of Guaspari and Solovay* (1987), Lemma 4, which has that a model of R⁻ puts `≺` and `≼` between
-them. Within those bounds the rules leave the comparisons free; R⁻ does not.
+A model of R⁻ is a finite tree-ordered model of GL in which the comparisons persist and order
+the boxed formulas as Guaspari and Solovay's axioms say. De Jongh's *A simplification of a
+completeness proof of Guaspari and Solovay* (1987), Lemma 2, spells that out, and with
+persistence it comes to this: at each world the boxed formulas that hold there are totally
+preordered; that order is the order they had at the world before, followed by the formulas that
+came to hold at this world, in any order at all. So a model is a model of GL with, at each
+world, a total preorder of the boxed formulas that first hold there, and a comparison holds at a
+world as its two formulas came to hold on the way down to it: the first came to hold at an
+earlier world than the second, or the second never did, or they came to hold at the same world,
+and its order says so.
+
+Take an open branch. At each world, the comparisons on the branch there have no circle, so
+there is a total preorder of all boxed formulas that satisfies them: choose one for each world.
+With the model of GL that the branch describes, in which a comparison is first read as a
+sentence letter, they define a model of R⁻, comparisons within comparisons being settled from
+the inside out. What is on the branch is true in it:
+
+- `c, j`. Go up from `j` to the first world `k` on the way down that has `c`. By the fourth
+  rule, the world that started `k` has `¬□B`, or a world it sees does, or `k` is the first
+  world, so `□B` doesn't hold before `k`; by the second, `□A` holds at `k`. So `□A` came to hold
+  before `□B` did, or both at `k`, where `c` is on the branch, and the order chosen for `k`
+  satisfies it.
+- `¬c, i`. By the third rule the branch has `¬□A` at `i` or at a world `i` sees, and `c` fails,
+  or it has `c̄` at `i`, which is true by the case above, and `c` fails.
+
+The comparisons of formulas outside the sentence are then as in de Jongh's extension lemma.
+That the rules are sound is that each is a theorem of R⁻: the third is
+`¬c ↔ ¬□A ∨ c̄`, and the fourth `◇c → c ∨ ¬□B`.
 
 What the rules are worth is in the sizes. The Parikh sentence `Π ↔ □□Π ≺ □Π` is provably
-provable, `⊡(Π ↔ □□Π ≺ □Π) → □Π`: the tableau here has 9 branches and some 50 lines, and
-the tableau with the four axioms as premises has 9,500 branches and 26,000 lines.
+provable, `⊡(Π ↔ □□Π ≺ □Π) → □Π`: the tableau here has 10 branches and some 70 lines, and the tableau
+with just the axioms for persistence and true before false as premises, the comparison read as a
+sentence letter, has 9,500 branches and 26,000 lines.
 
 ## Files
 

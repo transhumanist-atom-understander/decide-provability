@@ -25,6 +25,7 @@ rules that branch. -/
 def priority : Line → Nat
   | fml _ (∼□_) | fml _ (◇_) => 1
   | fml _ (∼(_ ⋏ _)) | fml _ (_ ⋎ _) | fml _ (_ 🡒 _) | fml _ (_ 🡘 _) | fml _ (∼(_ 🡘 _)) => 2
+  | fml _ (∼(□_ ≺ □_)) | fml _ (∼(□_ ≼ □_)) => 2
   | _ => 0
 
 instance : Repr Line := ⟨fun
@@ -42,6 +43,10 @@ inductive Tree
   | split (line : Line) (new₁ : List Line) (below₁ : Tree) (new₂ : List Line) (below₂ : Tree)
   /-- `A, i` and `¬A, i` are both on the branch, or `A` is `⊥`. -/
   | closed (i : Nat) (A : Formula)
+  /-- The comparisons `cs` are on the branch at world `i`, and go round in a circle: each
+  compares the second formula of the one before it, the first that of the last, and the first
+  is strict. -/
+  | cycle (i : Nat) (cs : List Formula)
   /-- No rule applies: the branch is open. -/
   | exhausted
   deriving Inhabited
@@ -51,7 +56,7 @@ namespace Tree
 def isClosed : Tree → Bool
   | step _ _ t => t.isClosed
   | split _ _ t₁ _ t₂ => t₁.isClosed && t₂.isClosed
-  | closed .. => true
+  | closed .. | cycle .. => true
   | exhausted => false
 
 /-- The lines below the root of each open branch, oldest first, the branches from left to
@@ -59,7 +64,7 @@ right. -/
 def openBranches : Tree → List (List Line)
   | step _ new t => t.openBranches.map (new ++ ·)
   | split _ n₁ t₁ n₂ t₂ => t₁.openBranches.map (n₁ ++ ·) ++ t₂.openBranches.map (n₂ ++ ·)
-  | closed .. => []
+  | closed .. | cycle .. => []
   | exhausted => [[]]
 
 /-- The lines `ls` as nodes of a `prooftree` of the `prooftrees` LaTeX package, each nested in
@@ -72,7 +77,7 @@ def chain : List Line → Nat → String → String
 def tex : Tree → Nat → String
   | step _ new t, d => chain new d (t.tex (d + new.length))
   | split _ n₁ t₁ n₂ t₂, d => chain n₁ d (t₁.tex (d + n₁.length)) ++ chain n₂ d (t₂.tex (d + n₂.length))
-  | closed .., _ => ", close"
+  | closed .., _ | cycle .., _ => ", close"
   | exhausted, _ => ""
 
 /-- The tree as a Lean term naming the constructors, each node on its own line at depth `d`. -/
@@ -81,6 +86,7 @@ protected def repr (t : Tree) (d : Nat) : String :=
   | step l new t => s!"(.step {repr l} {lines new}{t.repr (d + 1)})"
   | split l n₁ t₁ n₂ t₂ => s!"(.split {repr l} {lines n₁}{t₁.repr (d + 1)} {lines n₂}{t₂.repr (d + 1)})"
   | closed i A => s!"(.closed {i} {A.repr})"
+  | cycle i cs => s!"(.cycle {i} [{", ".intercalate (cs.map (·.repr))}])"
   | exhausted => ".exhausted"
 where
   /-- A list of lines, however long, on one line. -/
@@ -191,15 +197,51 @@ def settled (branch : List Line) (i : Nat) (A B : Formula) : Bool :=
     | .fml k (∼□C) => C = A && (k = i || .rel i k ∈ branch)
     | _ => false
 
-/-- That `□B` comes to hold no later than `□A`, at the worlds `ks` on the way down to a world
-where a comparison says so: the lines `□A → □B, k` that aren't settled, earliest world first. -/
-def noLater (branch : List Line) (ks : List Nat) (A B : Formula) : List Line :=
-  ((ks.filter (!settled branch · A B)).mergeSort (· ≤ ·)).map (.fml · (□A 🡒 □B))
+/-- Whether the branch already makes the comparison `c` true at world `i`: it is on it at `i`
+or at a world that sees `i`, since a comparison persists. -/
+def holds (branch : List Line) (i : Nat) (c : Formula) : Bool :=
+  branch.any fun
+    | .fml k A => A = c && (k = i || .rel k i ∈ branch)
+    | _ => false
+
+/-- Whether the branch already makes `□A` false at world `i`: `¬□A` is on it at `i` or at a
+world that `i` sees. -/
+def fails (branch : List Line) (i : Nat) (A : Formula) : Bool :=
+  branch.any fun
+    | .fml k (∼□C) => C = A && (k = i || .rel i k ∈ branch)
+    | _ => false
+
+/-- The comparisons on the branch at world `i`, each with the two formulas whose boxes it
+compares: the edges of the graph that the order of the boxed formulas at `i` must extend. -/
+def edges (branch : List Line) (i : Nat) : List (Formula × Formula × Formula) :=
+  branch.filterMap fun
+    | .fml k (□A ≺ □B) => if k = i then some (□A ≺ □B, A, B) else none
+    | .fml k (□A ≼ □B) => if k = i then some (□A ≼ □B, A, B) else none
+    | _ => none
+
+/-- Comparisons among `es` that lead from `□A` to `□B`, each comparing the second formula of
+the one before: none if `A` is `B`. A formula that has been left is not come back to. -/
+def path (es : List (Formula × Formula × Formula)) (A B : Formula) : Option (List Formula) :=
+  go es.length es A
+where
+  go : Nat → List (Formula × Formula × Formula) → Formula → Option (List Formula)
+    | 0, _, A => if A = B then some [] else none
+    | n + 1, es, A =>
+      if A = B then some [] else
+      es.findSome? fun (c, A', C) =>
+        if A' = A then (go n (es.filter (·.2.1 ≠ A)) C).map (c :: ·) else none
+
+/-- A world with comparisons on the branch that no order satisfies, and those comparisons: a
+strict one, `□A ≺ □B`, and others that lead from `□B` back to `□A`. -/
+def circle (branch : List Line) : Option (Nat × List Formula) :=
+  branch.findSome? fun
+    | .fml i (□A ≺ □B) => (path (edges branch i) B A).map fun cs => (i, (□A ≺ □B) :: cs)
+    | _ => none
 
 /-- Priest's rules, with the GL rule for `¬□`, the matching rule for `◇`, and transitivity, and
-the rules for witness comparisons, none of which branch: the tree below `l`, given what's below
-the new lines of a branch; `none` when no rule applies. A rule with two premises is applied to
-each, which looks for the other, so whichever comes second finds the first. -/
+the rules for witness comparisons: the tree below `l`, given what's below the new lines of a
+branch; `none` when no rule applies. A rule with two premises is applied to each, which looks
+for the other, so whichever comes second finds the first. -/
 def rule (l : Line) (branch : List Line) (below : List Line → Tree) : Option Tree :=
   let one new := some (Tree.step l new (below new))
   let two n₁ n₂ := some (Tree.split l n₁ (below n₁) n₂ (below n₂))
@@ -214,6 +256,11 @@ def rule (l : Line) (branch : List Line) (below : List Line → Tree) : Option T
     | ∼∼B => one [.fml i B]
     | B ⋏ C => one [.fml i B, .fml i C]
     | ∼(B ⋏ C) => two [.fml i ∼B] [.fml i ∼C]
+    /- Where a comparison started, which the branch may have settled. -/
+    | (□B ≺ □C) ⋎ ∼□D =>
+      if holds branch i (□B ≺ □C) || fails branch i D then none else two [.fml i (□B ≺ □C)] [.fml i ∼□D]
+    | (□B ≼ □C) ⋎ ∼□D =>
+      if holds branch i (□B ≼ □C) || fails branch i D then none else two [.fml i (□B ≼ □C)] [.fml i ∼□D]
     | B ⋎ C => two [.fml i B] [.fml i C]
     | ∼(B ⋎ C) => one [.fml i ∼B, .fml i ∼C]
     | □B 🡒 □C => if settled branch i B C then none else two [.fml i ∼□B] [.fml i □C]
@@ -225,26 +272,33 @@ def rule (l : Line) (branch : List Line) (below : List Line → Tree) : Option T
     | ∼□B => one [.rel i j, .fml j ∼B, .fml j □B]
     | ◇B => one [.rel i j, .fml j B, .fml j □∼B]
     | ∼◇B => one [.fml i □∼B]
-    /- A comparison that holds: it persists, its first formula holds, and its second came to
-    hold no earlier than its first. -/
-    | □B ≺ □C | □B ≼ □C => found (seen.map (.fml · A) ++ [.fml i □B] ++ noLater branch above C B)
-    /- A comparison that fails: its first formula came to hold no earlier than its second. -/
-    | ∼(□B ≺ □C) | ∼(□B ≼ □C) => found (noLater branch (above ++ [i]) B C)
+    /- A comparison that holds: it persists, its first formula holds, and at the world that
+    started this one it held already, or its second formula didn't. -/
+    | □B ≺ □C | □B ≼ □C =>
+      let before := match above.max? with
+        | some k => if holds branch k A || fails branch k C then [] else [.fml k (A ⋎ ∼□C)]
+        | none => []
+      found (seen.map (.fml · A) ++ [.fml i □B] ++ before)
+    /- A comparison that fails: its first formula doesn't hold, or the converse comparison
+    does. -/
+    | ∼(□B ≺ □C) =>
+      if fails branch i B || holds branch i (□C ≼ □B) then none else two [.fml i ∼□B] [.fml i (□C ≼ □B)]
+    | ∼(□B ≼ □C) =>
+      if fails branch i B || holds branch i (□C ≺ □B) then none else two [.fml i ∼□B] [.fml i (□C ≺ □B)]
     | _ => none
   | .rel i j => found <| branch.flatMap fun
       | .fml k A =>
         match A with
         | □B => if k = i then [.fml j B] else []
-        | □B ≺ □C | □B ≼ □C =>
-          if k = i then [.fml j A] else if k = j then noLater branch [i] C B else []
-        | ∼(□B ≺ □C) | ∼(□B ≼ □C) => if k = j then noLater branch [i] B C else []
+        | □_ ≺ □_ | □_ ≼ □_ => if k = i then [.fml j A] else []
         | _ => []
       | .rel k m => if m = i then [.rel k j] else if k = j then [.rel i m] else []
 
-/-- The procedure below `branch` (oldest line first): close if there is a clash, else expand
-the first line of `todo` by priority, until none is left. -/
+/-- The procedure below `branch` (oldest line first): close if there is a clash, or a circle of
+comparisons, else expand the first line of `todo` by priority, until none is left. -/
 partial def expand (branch todo : List Line) : Tree :=
   if let some (i, A) := clash branch then .closed i A else
+  if let some (i, cs) := circle branch then .cycle i cs else
   match todo.mergeSort (·.priority ≤ ·.priority) with
   | [] => .exhausted
   | l :: todo =>
@@ -273,21 +327,21 @@ def tex (t : Tableau) : String :=
 from left to right: none if the tableau closed, and one for branches that are drawn the same.
 Of a sentence of GL each is a countermodel: a finite tree, read as the transitive order it
 generates, at whose first world the sentence fails, however the letters the branch doesn't
-speak of at a world are valued there. Of a sentence with comparisons each is a model of what
-the rules say of them, and not always one of R⁻. -/
+speak of at a world are valued there. Of a sentence with comparisons each is a countermodel
+too, a model of R⁻: the comparisons the branch doesn't speak of at a world hold there or don't
+as the boxed formulas came to hold on the way down to it, those that came to hold together in
+any order that the comparisons the branch does speak of there allow. -/
 def modelsTex (t : Tableau) : List String :=
   (t.tree.openBranches.map fun branch => Model.tex (.fml 0 ∼t.sentence :: branch)).eraseDups
 
-/-- What the tableau shows. A closed tableau is a proof in R⁻, and in GL if the sentence is
-GL's. An open one refutes a sentence of GL, for which the rules are GL's and complete; for a
-sentence with comparisons it only shows that the rules here, which leave out how R⁻ orders
-boxed formulas that come to hold together, are not enough. -/
+/-- What the tableau shows. A closed tableau is a proof, and an open one a refutation: the
+rules are complete for R⁻, and for a sentence of GL they are GL's. -/
 def claim (t : Tableau) : String :=
   match t.tree.isClosed, t.sentence.isGL with
   | true, true => s!"{t.sentence} is a theorem of GL"
   | true, false => s!"{t.sentence} is a theorem of R⁻"
   | false, true => s!"{t.sentence} is not a theorem of GL"
-  | false, false => s!"{t.sentence} does not follow from persistence and true before false"
+  | false, false => s!"{t.sentence} is not a theorem of R⁻"
 
 /-- `t` as a Lean file defining it as `t`. -/
 def lean (t : Tableau) : String :=
