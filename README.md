@@ -29,8 +29,9 @@ then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read as
 `#eval Tableau.decide A (·.tex)` prints the tableau as a `prooftree` of the `prooftrees` LaTeX
 package, with its sentence letters as they are. `#eval Tableau.decide A ("\n".intercalate ·.modelsTex)` prints the
 models that the open branches describe, from left to right and one for branches that are drawn
-the same, each as a `tikzpicture` for a document with the packages `tikz` and `amssymb`, with a
-blank line between them, or nothing if the tableau closed. A model is drawn with its worlds as a tree, an arrow from each
+the same, each as a tree of the `forest` LaTeX package, for a document that also has the package
+`amssymb` and the TikZ library `shapes.multipart`, with a blank line between them, or nothing if
+the tableau closed. A model is drawn with its worlds as a tree, an arrow from each
 to the worlds that the rules for `¬□` and `◇` started from it, which stands for the transitive
 order that generates, and by each world what the branch says there of the sentence letters and
 the comparisons, which are named `c₁`, `c₂` and so on there and spelled out below the worlds,
