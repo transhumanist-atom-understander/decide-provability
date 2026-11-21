@@ -354,6 +354,13 @@ its tableau. -/
 def decide (s : String) (print : Tableau → String := lean) : IO Unit := do
   IO.print (print (of (← IO.ofExcept (Formula.parse s))))
 
+/-- Prints the sentence `s` in LaTeX, as a Python format string with a replacement field for
+each sentence letter, as `format` gives the LaTeX of a tableau, or fails with `s`'s parse
+error. No tableau is built for it. -/
+def sentenceTex (s : String) : IO Unit := do
+  let A ← IO.ofExcept (Formula.parse s)
+  IO.print (Formula.formatString (A.render (.fields A.letters)))
+
 /-- Prints the sentence letters of the sentence `s`, each once, in the order they first come
 in, with a space between them, or fails with `s`'s parse error: what the wrapper has Lean
 evaluate for the letters that the fields of a format string are for. -/

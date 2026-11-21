@@ -47,7 +47,8 @@ prints the `prooftree` as a Python format string: the place of each letter among
 for the first, where the letter would be, and the braces that are LaTeX's doubled. The wrapper
 turns each letter into LaTeX and formats the string with them. `fun t s => t.modelsTex s` and
 the like take the place of `fun t s => t.tex s`: `s` is how to spell the connectives and the
-letters, a `Formula.Style`.
+letters, a `Formula.Style`. `#eval Tableau.sentenceTex A` prints such a format string for the
+sentence alone, and builds no tableau for it.
 
 The REPL is required at the tag for this project's toolchain, so the two move together, and is
 built here as the executable `repl`, with the library linked in. The REPL interprets the Lean it
