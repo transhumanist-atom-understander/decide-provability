@@ -359,9 +359,12 @@ def claim (t : Tableau) : String :=
 def lean (t : Tableau) : String :=
   s!"import RTableau\n\n/-- {t.claim} -/\ndef t : Tableau where\n  sentence := {t.sentence.repr}\n  tree :={t.tree.repr 2}\n"
 
+/-- The tableau for the sentence `s`, or `s`'s parse error. -/
+def ofSentence (s : String) : IO Tableau := of <$> IO.ofExcept (Formula.parse s)
+
 /-- Prints the tableau for the sentence `s` as a Lean file, or fails with `s`'s parse error:
 what the wrapper has Lean evaluate to decide a sentence. -/
 def decide (s : String) : IO Unit := do
-  IO.print (of (← IO.ofExcept (Formula.parse s))).lean
+  IO.print (← ofSentence s).lean
 
 end Tableau

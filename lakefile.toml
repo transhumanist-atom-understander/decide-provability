@@ -1,5 +1,5 @@
 name = "decide-provability"
-defaultTargets = ["RTableau"]
+defaultTargets = ["RTableau", "repl"]
 
 [[lean_lib]]
 name = "RTableau"
@@ -10,3 +10,10 @@ name = "RTableau"
 name = "REPL"
 git = "https://github.com/augustepoiroux/repl"
 rev = "v1.3.19_lean-toolchain-v4.34.0"
+
+# That REPL with `RTableau` linked in, so that what it evaluates of the library runs as compiled
+# code: the REPL's own executable would run it in Lean's interpreter.
+[[lean_exe]]
+name = "repl"
+root = "Main"
+supportInterpreter = true
