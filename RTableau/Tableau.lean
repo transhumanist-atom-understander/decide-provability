@@ -16,10 +16,6 @@ def tex : Line → String
   | fml i A => s!"{A.render .tex}, {i}"
   | rel i j => s!"{i}r{j}"
 
-def worlds : Line → List Nat
-  | fml i _ => [i]
-  | rel i j => [i, j]
-
 /-- The order of expansion: rules that don't branch, then rules that start a new world, then
 rules that branch. -/
 def priority : Line → Nat
@@ -175,18 +171,24 @@ def tex (branch : List Line) : String :=
 
 end Model
 
-/-- A world `i` where `A, i` and `¬A, i`, or `⊥, i`, are on the branch. -/
-def clash (branch : List Line) : Option (Nat × Formula) :=
-  branch.findSome? fun
+/-- A world `i` where `A, i` and `¬A, i`, or `⊥, i`, are on the branch: the one of the first
+line `¬A, i` or `⊥, i` that makes it so. The branch is `old` and then `new`, and `old` has no
+such world, so that line is a `¬A, i` of `old` with `A, i` in `new`, or it is in `new`. -/
+def clash (old new : List Line) : Option (Nat × Formula) :=
+  (old.findSome? fun
+    | .fml i (∼A) => if .fml i A ∈ new then some (i, A) else none
+    | _ => none) <|>
+  new.findSome? fun
     | .fml i ⊥ => some (i, ⊥)
-    | .fml i (∼A) => if .fml i A ∈ branch then some (i, A) else none
+    | .fml i (∼A) => if .fml i A ∈ new || .fml i A ∈ old then some (i, A) else none
     | _ => none
 
 /-- The lines of `new` not yet on the branch. -/
 def absent (branch new : List Line) : List Line := (new.filter (· ∉ branch)).eraseDups
 
 /-- A world not yet on the branch. -/
-def fresh (branch : List Line) : Nat := (branch.flatMap Line.worlds).max?.getD 0 + 1
+def fresh (branch : List Line) : Nat :=
+  branch.foldl (fun j => fun | .fml i _ => max j i | .rel i k => max j (max i k)) 0 + 1
 
 /-- Whether the branch already makes `□A → □B` true at world `i`: `A` is `B`, or `□B` is on it
 at `i` or at a world that sees `i`, or `¬□A` is on it at `i` or at a world that `i` sees. A
@@ -232,10 +234,15 @@ where
         if A' = A then (go n (es.filter (·.2.1 ≠ A)) C).map (c :: ·) else none
 
 /-- A world with comparisons on the branch that no order satisfies, and those comparisons: a
-strict one, `□A ≺ □B`, and others that lead from `□B` back to `□A`. -/
-def circle (branch : List Line) : Option (Nat × List Formula) :=
+strict one, `□A ≺ □B`, and others that lead from `□B` back to `□A`. The branch ends with the
+lines `new` and had no such world before them, so it is a world where one of them is a
+comparison, and only those are searched. -/
+def circle (branch new : List Line) : Option (Nat × List Formula) :=
+  let worlds := new.filterMap fun | .fml i (□_ ≺ □_) | .fml i (□_ ≼ □_) => some i | _ => none
+  if worlds.isEmpty then none else
   branch.findSome? fun
-    | .fml i (□A ≺ □B) => (path (edges branch i) B A).map fun cs => (i, (□A ≺ □B) :: cs)
+    | .fml i (□A ≺ □B) =>
+      if i ∈ worlds then (path (edges branch i) B A).map fun cs => (i, (□A ≺ □B) :: cs) else none
     | _ => none
 
 /-- Priest's rules, with the GL rule for `¬□`, the matching rule for `◇`, and transitivity, and
@@ -294,17 +301,22 @@ def rule (l : Line) (branch : List Line) (below : List Line → Tree) : Option T
         | _ => []
       | .rel k m => if m = i then [.rel k j] else if k = j then [.rel i m] else []
 
-/-- The procedure below `branch` (oldest line first): close if there is a clash, or a circle of
-comparisons, else expand the first line of `todo` by priority, until none is left. -/
-partial def expand (branch todo : List Line) : Tree :=
-  if let some (i, A) := clash branch then .closed i A else
-  if let some (i, cs) := circle branch then .cycle i cs else
-  match todo.mergeSort (·.priority ≤ ·.priority) with
-  | [] => .exhausted
-  | l :: todo =>
-    match rule l branch fun new => expand (branch ++ new) (todo ++ new) with
-    | some t => t
-    | none => expand branch todo
+/-- The procedure below `branch` (oldest line first) once the lines `new` are added to it and
+to `todo`: close if there is a clash, or a circle of comparisons, else expand the first line of
+`todo` by priority, until none is left. The branch had no clash and no circle before `new`, or
+it would have closed, so they are looked for only where `new` can have made one. -/
+partial def expand (branch new todo : List Line) : Tree :=
+  if let some (i, A) := clash branch new then .closed i A else
+  if let some (i, cs) := circle (branch ++ new) new then .cycle i cs else
+  next (branch ++ new) (todo ++ new)
+where
+  next (branch todo : List Line) : Tree :=
+    match todo.mergeSort (·.priority ≤ ·.priority) with
+    | [] => .exhausted
+    | l :: todo =>
+      match rule l branch (expand branch · todo) with
+      | some t => t
+      | none => next branch todo
 
 end Tableau
 
@@ -317,7 +329,7 @@ namespace Tableau
 
 open Notation
 
-def of (A : Formula) : Tableau := ⟨A, expand [.fml 0 ∼A] [.fml 0 ∼A]⟩
+def of (A : Formula) : Tableau := ⟨A, expand [] [.fml 0 ∼A] []⟩
 
 def tex (t : Tableau) : String :=
   "\\begin{prooftree}{not line numbering}" ++ Tree.chain [.fml 0 ∼t.sentence] 1 (t.tree.tex 2)
