@@ -23,10 +23,12 @@ it as `t`, or fails with `A`'s parse error: a sentence letter is any run of char
 than whitespace, parentheses and the connectives, `¬ □ ◇ ⊡` bind tightest, then `≺` and `≼`,
 then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read as `¬⊥` and `⊡A` as
 `A ∧ □A`. What `≺` and `≼` compare must be written as boxed formulas: `□p ≺ □q ∧ r` is
-`(□p ≺ □q) ∧ r`, and `¬□p ≺ □q` doesn't parse, but `¬(□p ≺ □q)` does. That file, with
-`#eval IO.print t.tex` added, prints the tableau as a `prooftree` of the `prooftrees` LaTeX
+`(□p ≺ □q) ∧ r`, and `¬□p ≺ □q` doesn't parse, but `¬(□p ≺ □q)` does.
+
+`Tableau.decide` takes a second argument, what to print of the tableau in place of the file.
+`#eval Tableau.decide A (·.tex)` prints the tableau as a `prooftree` of the `prooftrees` LaTeX
 package; sentence letters are printed as they are, and the wrapper turns Greek letters and other
-such characters into LaTeX commands. With `#eval IO.print ("\n".intercalate t.modelsTex)` it prints the
+such characters into LaTeX commands. `#eval Tableau.decide A ("\n".intercalate ·.modelsTex)` prints the
 models that the open branches describe, from left to right and one for branches that are drawn
 the same, each as a `tikzpicture` for a document with the packages `tikz` and `amssymb`, with a
 blank line between them, or nothing if the tableau closed. A model is drawn with its worlds as a tree, an arrow from each
@@ -43,10 +45,12 @@ is given, and its own executable interprets a library that is imported too; this
 is evaluated of `RTableau` as compiled code, which builds a tableau some fifteen times faster.
 It is the library it was linked with that it runs, so `lake build` after a change to it.
 
-Lean builds a tableau much faster than it reads the file of one: it takes longer to elaborate
-the definition of `t` than to work out what it defines. So `Tableau.ofSentence A` is the tableau
-for `A` itself, or fails as `Tableau.decide A` does, and the wrapper evaluates what it wants of
-a tableau that it had built with that in place of the file.
+The tableau is built each time, for each thing that is printed of it, and nothing is kept: for
+a sentence of a line, that takes a tenth of a millisecond, where the REPL takes a few
+milliseconds to evaluate anything at all. The Lean file is a record of the tableau, which
+`#eval IO.print t.tex` and the like can be added to, but Lean builds a tableau much faster than
+it reads the file of one: it takes far longer to elaborate the definition of `t` than to work
+out what it defines. So there is nothing to gain by keeping the file to read again.
 
     $ lake exe repl
     {"cmd": "import RTableau"}
