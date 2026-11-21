@@ -72,9 +72,10 @@ where
     <|> atom <$> (many1Chars (satisfy fun c => !c.isWhitespace && !"()¬□◇⊡⊥⊤∧∨→↔≺≼".contains c) <* ws)
   tok (s : String) : Parser Unit := skipString s <* ws
 
-/-- How to spell the connectives. -/
+/-- How to spell the connectives, and a sentence letter: as it is. -/
 structure Style where
   (neg box dia bot and or imp iff prec preceq : String)
+  letter : String → String := id
 
 def Style.unicode : Style :=
   { neg := "¬", box := "□", dia := "◇", bot := "⊥", and := " ∧ ", or := " ∨ ", imp := " → ", iff := " ↔ ",
@@ -87,7 +88,7 @@ def Style.tex : Style :=
 
 /-- `A` in style `s`, with parentheses around any operand that has a binary connective. -/
 def render (s : Style) : Formula → String
-  | atom a => a
+  | atom a => s.letter a
   | ⊥ => s.bot
   | ∼A => s.neg ++ operand A (render s A)
   | □A => s.box ++ operand A (render s A)
@@ -121,6 +122,27 @@ protected def repr : Formula → String
   | □A ≼ □B => s!"(.preceq {A.repr} {B.repr})"
 
 instance : Repr Formula := ⟨fun A _ => A.repr⟩
+
+/-- The sentence letters of `A`, each once, in the order they first come in. -/
+def letters (A : Formula) : List String := (all A).eraseDups
+where
+  all : Formula → List String
+    | atom a => [a]
+    | ⊥ => []
+    | ∼A | □A | ◇A => all A
+    | A ⋏ B | A ⋎ B | A 🡒 B | A 🡘 B | □A ≺ □B | □A ≼ □B => all A ++ all B
+
+/-- The LaTeX style for a Python format string: in place of a sentence letter, its place among
+`letters`, between marks that `formatString` makes the braces of a replacement field. Python can then
+put in each letter as it would have it in LaTeX, which is not for Lean to know. -/
+def Style.fields (letters : List String) : Style :=
+  { Style.tex with letter := fun a => s!"\uE000{letters.idxOf a}\uE001" }
+
+/-- `tex`, which is in the style `Style.fields`, as a Python format string: its braces are
+doubled, to stand for themselves, and the marks around the place of a letter are braces. -/
+def formatString (tex : String) : String :=
+  tex.foldl (fun s c => s ++ match c with
+    | '{' => "{{" | '}' => "}}" | '\uE000' => "{" | '\uE001' => "}" | c => c.toString) ""
 
 /-- Whether `A` is a formula of GL: it has no witness comparison. -/
 def isGL : Formula → Bool

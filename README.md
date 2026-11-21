@@ -7,7 +7,8 @@ Logic* §1.4 and §2.4, with the rule for `¬□` that makes them GL tableaux an
 comparisons. It is a Lean library, `RTableau`, that the Python package `rtableau` of
 [wrap-provability](https://github.com/transhumanist-atom-understander/wrap-provability) uses;
 use it from there. It depends on nothing but Lean and the
-[Lean REPL](https://github.com/augustepoiroux/repl), so it builds in seconds:
+[Lean REPL](https://github.com/augustepoiroux/repl), so it builds in half a minute, the library
+and the REPL that the wrapper runs:
 
     $ lake build
 
@@ -16,28 +17,53 @@ tableau closes if its sentence is a theorem of R⁻ and doesn't if it is not, an
 branch describes a countermodel. For a sentence of GL, one with no comparison, the rules that
 apply are GL's, so its tableau closes if it is a theorem of GL and doesn't if it is not.
 
-The wrapper runs the REPL in this project, with `RTableau` imported once, and has it evaluate
+The wrapper runs that REPL in this project, with `RTableau` imported once, and has it evaluate
 Lean. `#eval Tableau.decide A` prints the tableau for the sentence `A` as a Lean file, defining
 it as `t`, or fails with `A`'s parse error: a sentence letter is any run of characters other
 than whitespace, parentheses and the connectives, `¬ □ ◇ ⊡` bind tightest, then `≺` and `≼`,
 then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read as `¬⊥` and `⊡A` as
 `A ∧ □A`. What `≺` and `≼` compare must be written as boxed formulas: `□p ≺ □q ∧ r` is
-`(□p ≺ □q) ∧ r`, and `¬□p ≺ □q` doesn't parse, but `¬(□p ≺ □q)` does. That file, with
-`#eval IO.print t.tex` added, prints the tableau as a `prooftree` of the `prooftrees` LaTeX
-package; sentence letters are printed as they are, and the wrapper turns Greek letters and other
-such characters into LaTeX commands. With `#eval IO.print ("\n".intercalate t.modelsTex)` it prints the
+`(□p ≺ □q) ∧ r`, and `¬□p ≺ □q` doesn't parse, but `¬(□p ≺ □q)` does.
+
+`Tableau.decide` takes a second argument, what to print of the tableau in place of the file.
+`#eval Tableau.decide A (·.tex)` prints the tableau as a `prooftree` of the `prooftrees` LaTeX
+package, with its sentence letters as they are. `#eval Tableau.decide A ("\n".intercalate ·.modelsTex)` prints the
 models that the open branches describe, from left to right and one for branches that are drawn
-the same, each as a `tikzpicture` for a document with the packages `tikz` and `amssymb`, with a
-blank line between them, or nothing if the tableau closed. A model is drawn with its worlds as a tree, an arrow from each
+the same, each as a tree of the `forest` LaTeX package, for a document that also has the package
+`amssymb` and the TikZ library `shapes.multipart`, with a blank line between them, or nothing if
+the tableau closed. A model is drawn with its worlds as a tree, an arrow from each
 to the worlds that the rules for `¬□` and `◇` started from it, which stands for the transitive
 order that generates, and by each world what the branch says there of the sentence letters and
 the comparisons, which are named `c₁`, `c₂` and so on there and spelled out below the worlds,
 to keep the drawing narrow. Each is a countermodel, however the letters a world says nothing of
 are valued there; the comparisons it says nothing of are then settled by how the boxed formulas
-came to hold on the way down to it, [as below](#why-they-are-complete). The REPL is required at the tag for this project's
-toolchain, so the two move together.
+came to hold on the way down to it, [as below](#why-they-are-complete).
 
-    $ lake env .lake/packages/REPL/.lake/build/bin/repl
+A sentence letter is printed as it is, in LaTeX too, so one that is LaTeX is as LaTeX has it:
+`\varphi`, or `p_{1}`. What the LaTeX is for `φ` is not for this library to know. The wrapper
+knows, and asks for two things. `#eval Tableau.letters A` prints the sentence letters of `A`,
+each once, with a space between them. `#eval Tableau.decide A (·.format fun t s => t.tex s)`
+prints the `prooftree` as a Python format string: the place of each letter among those, `{0}`
+for the first, where the letter would be, and the braces that are LaTeX's doubled. The wrapper
+turns each letter into LaTeX and formats the string with them. `fun t s => t.modelsTex s` and
+the like take the place of `fun t s => t.tex s`: `s` is how to spell the connectives and the
+letters, a `Formula.Style`. `#eval Tableau.sentenceTex A` prints such a format string for the
+sentence alone, and builds no tableau for it.
+
+The REPL is required at the tag for this project's toolchain, so the two move together, and is
+built here as the executable `repl`, with the library linked in. The REPL interprets the Lean it
+is given, and its own executable interprets a library that is imported too; this one runs what
+is evaluated of `RTableau` as compiled code, which builds a tableau some fifteen times faster.
+It is the library it was linked with that it runs, so `lake build` after a change to it.
+
+The tableau is built each time, for each thing that is printed of it, and nothing is kept: for
+a sentence of a line, that takes a tenth of a millisecond, where the REPL takes a few
+milliseconds to evaluate anything at all. The Lean file is a record of the tableau, which
+`#eval IO.print t.tex` and the like can be added to, but Lean builds a tableau much faster than
+it reads the file of one: it takes far longer to elaborate the definition of `t` than to work
+out what it defines. So there is nothing to gain by keeping the file to read again.
+
+    $ lake exe repl
     {"cmd": "import RTableau"}
 
     {"env": 0}
@@ -162,3 +188,4 @@ sentence letter, has 9,500 branches and 26,000 lines.
 - `RTableau/Tableau.lean`: lines, the tree a tableau builds, the rules, the procedure, the drawing of
   an open branch's model, and the `Tableau` a Lean file defines.
 - `RTableau.lean`: the library, the two modules above.
+- `Main.lean`: the executable `repl`, the REPL with the library linked in.
