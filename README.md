@@ -27,8 +27,7 @@ then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read as
 
 `Tableau.decide` takes a second argument, what to print of the tableau in place of the file.
 `#eval Tableau.decide A (·.tex)` prints the tableau as a `prooftree` of the `prooftrees` LaTeX
-package; sentence letters are printed as they are, and the wrapper turns Greek letters and other
-such characters into LaTeX commands. `#eval Tableau.decide A ("\n".intercalate ·.modelsTex)` prints the
+package, with its sentence letters as they are. `#eval Tableau.decide A ("\n".intercalate ·.modelsTex)` prints the
 models that the open branches describe, from left to right and one for branches that are drawn
 the same, each as a `tikzpicture` for a document with the packages `tikz` and `amssymb`, with a
 blank line between them, or nothing if the tableau closed. A model is drawn with its worlds as a tree, an arrow from each
@@ -38,6 +37,16 @@ the comparisons, which are named `c₁`, `c₂` and so on there and spelled out 
 to keep the drawing narrow. Each is a countermodel, however the letters a world says nothing of
 are valued there; the comparisons it says nothing of are then settled by how the boxed formulas
 came to hold on the way down to it, [as below](#why-they-are-complete).
+
+A sentence letter is printed as it is, in LaTeX too, so one that is LaTeX is as LaTeX has it:
+`\varphi`, or `p_{1}`. What the LaTeX is for `φ` is not for this library to know. The wrapper
+knows, and asks for two things. `#eval Tableau.letters A` prints the sentence letters of `A`,
+each once, with a space between them. `#eval Tableau.decide A (·.format fun t s => t.tex s)`
+prints the `prooftree` as a Python format string: the place of each letter among those, `{0}`
+for the first, where the letter would be, and the braces that are LaTeX's doubled. The wrapper
+turns each letter into LaTeX and formats the string with them. `fun t s => t.modelsTex s` and
+the like take the place of `fun t s => t.tex s`: `s` is how to spell the connectives and the
+letters, a `Formula.Style`.
 
 The REPL is required at the tag for this project's toolchain, so the two move together, and is
 built here as the executable `repl`, with the library linked in. The REPL interprets the Lean it

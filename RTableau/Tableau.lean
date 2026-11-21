@@ -12,8 +12,8 @@ inductive Line
 
 namespace Line
 
-def tex : Line → String
-  | fml i A => s!"{A.render .tex}, {i}"
+def tex (s : Formula.Style) : Line → String
+  | fml i A => s!"{A.render s}, {i}"
   | rel i j => s!"{i}r{j}"
 
 /-- The order of expansion: rules that don't branch, then rules that start a new world, then
@@ -63,16 +63,17 @@ def openBranches : Tree → List (List Line)
   | closed .. | cycle .. => []
   | exhausted => [[]]
 
-/-- The lines `ls` as nodes of a `prooftree` of the `prooftrees` LaTeX package, each nested in
-the one above at depth `d` on, with `rest` inside the last. -/
-def chain : List Line → Nat → String → String
+/-- The lines `ls`, in the style `s`, as nodes of a `prooftree` of the `prooftrees` LaTeX
+package, each nested in the one above at depth `d` on, with `rest` inside the last. -/
+def chain (s : Formula.Style) : List Line → Nat → String → String
   | [], _, rest => rest
-  | l :: ls, d, rest => s!"\n{"".pushn ' ' (2 * d)}[\{{l.tex}}{chain ls (d + 1) rest}]"
+  | l :: ls, d, rest => s!"\n{"".pushn ' ' (2 * d)}[\{{l.tex s}}{chain s ls (d + 1) rest}]"
 
-/-- The nodes below depth `d`, with `close` under a closed branch. -/
-def tex : Tree → Nat → String
-  | step _ new t, d => chain new d (t.tex (d + new.length))
-  | split _ n₁ t₁ n₂ t₂, d => chain n₁ d (t₁.tex (d + n₁.length)) ++ chain n₂ d (t₂.tex (d + n₂.length))
+/-- The nodes below depth `d`, in the style `s`, with `close` under a closed branch. -/
+def tex (s : Formula.Style) : Tree → Nat → String
+  | step _ new t, d => chain s new d (tex s t (d + new.length))
+  | split _ n₁ t₁ n₂ t₂, d =>
+    chain s n₁ d (tex s t₁ (d + n₁.length)) ++ chain s n₂ d (tex s t₂ (d + n₂.length))
   | closed .., _ | cycle .., _ => ", close"
   | exhausted, _ => ""
 
@@ -150,22 +151,22 @@ partial def layout (branch : List Line) (i depth : Nat) : List (Nat × Int × Na
     subs.foldl (fun m (x, _, l, _) => min m (x + l - mid)) (-4),
     subs.foldl (fun m (x, _, _, r) => max m (x + r - mid)) (4 + width branch i))
 
-/-- The model as a `tikzpicture`, which needs the LaTeX packages `tikz` and `amssymb`: an arrow
-from each world to the worlds it started, the others that it sees being those further down, and
-below them what the names of the comparisons stand for. -/
-def tex (branch : List Line) : String :=
+/-- The model as a `tikzpicture`, which needs the LaTeX packages `tikz` and `amssymb`, in the
+LaTeX style `s`: an arrow from each world to the worlds it started, the others that it sees
+being those further down, and below them what the names of the comparisons stand for. -/
+def tex (branch : List Line) (s : Formula.Style) : String :=
   let (worlds, left, right) := layout branch 0 0
   let node := fun ((i, x, d) : Nat × Int × Nat) =>
     s!"  \\node[inner sep=2pt] (w{i}) at ({x}mm,{-12 * (d : Int)}mm) \{$w_\{{i}}$};\n"
   let says := fun ((i, _, _) : Nat × Int × Nat) =>
     match facts branch i with
     | [] => ""
-    | fs => s!"  \\node[anchor=west, inner sep=0pt] at (w{i}.east) \{$\\,\\Vdash {", ".intercalate (fs.map (fact branch .tex true))}$};\n"
+    | fs => s!"  \\node[anchor=west, inner sep=0pt] at (w{i}.east) \{$\\,\\Vdash {", ".intercalate (fs.map (fact branch s true))}$};\n"
   let arrows := fun ((i, _, _) : Nat × Int × Nat) =>
     "".intercalate ((started branch i).map fun j => s!"  \\draw[->] (w{i}.south) -- (w{j}.north);\n")
   let depth := (worlds.map (·.2.2)).max?.getD 0
   let key := (comparisons branch).zipIdx.map fun (c, n) =>
-    s!"  \\node[inner sep=0pt] at ({(left + right) / 2}mm,{-12 * (depth : Int) - 10 - 7 * (n : Int)}mm) \{${fact branch .tex true c} = {c.render .tex}$};\n"
+    s!"  \\node[inner sep=0pt] at ({(left + right) / 2}mm,{-12 * (depth : Int) - 10 - 7 * (n : Int)}mm) \{${fact branch s true c} = {c.render s}$};\n"
   "\\begin{tikzpicture}[>=stealth]\n" ++ "".intercalate (worlds.map node ++ worlds.map says ++ worlds.map arrows ++ key)
     ++ "\\end{tikzpicture}\n"
 
@@ -331,8 +332,9 @@ open Notation
 
 def of (A : Formula) : Tableau := ⟨A, expand [] [.fml 0 ∼A] []⟩
 
-def tex (t : Tableau) : String :=
-  "\\begin{prooftree}{not line numbering}" ++ Tree.chain [.fml 0 ∼t.sentence] 1 (t.tree.tex 2)
+/-- The tableau as a `prooftree` of the `prooftrees` LaTeX package, in the LaTeX style `s`. -/
+def tex (t : Tableau) (s : Formula.Style := .tex) : String :=
+  "\\begin{prooftree}{not line numbering}" ++ Tree.chain s [.fml 0 ∼t.sentence] 1 (t.tree.tex s 2)
     ++ "\n\\end{prooftree}\n"
 
 /-- The models that the tableau's open branches describe, each as a `tikzpicture`, the branches
@@ -342,9 +344,16 @@ generates, at whose first world the sentence fails, however the letters the bran
 speak of at a world are valued there. Of a sentence with comparisons each is a countermodel
 too, a model of R⁻: the comparisons the branch doesn't speak of at a world hold there or don't
 as the boxed formulas came to hold on the way down to it, those that came to hold together in
-any order that the comparisons the branch does speak of there allow. -/
-def modelsTex (t : Tableau) : List String :=
-  (t.tree.openBranches.map fun branch => Model.tex (.fml 0 ∼t.sentence :: branch)).eraseDups
+any order that the comparisons the branch does speak of there allow. They are in the LaTeX
+style `s`. -/
+def modelsTex (t : Tableau) (s : Formula.Style := .tex) : List String :=
+  (t.tree.openBranches.map fun branch => Model.tex (.fml 0 ∼t.sentence :: branch) s).eraseDups
+
+/-- The LaTeX that `print` gives of the tableau, in a LaTeX style, as a Python format string
+with a replacement field for each sentence letter, `{0}` for the first of `t.sentence.letters`:
+what the wrapper asks for, to put in each letter as LaTeX has it, `\varphi` for `φ`. -/
+def format (t : Tableau) (print : Tableau → Formula.Style → String) : String :=
+  Formula.formatString (print t (.fields t.sentence.letters))
 
 /-- What the tableau shows. A closed tableau is a proof, and an open one a refutation: the
 rules are complete for R⁻, and for a sentence of GL they are GL's. -/
@@ -364,5 +373,11 @@ def lean (t : Tableau) : String :=
 its tableau. -/
 def decide (s : String) (print : Tableau → String := lean) : IO Unit := do
   IO.print (print (of (← IO.ofExcept (Formula.parse s))))
+
+/-- Prints the sentence letters of the sentence `s`, each once, in the order they first come
+in, with a space between them, or fails with `s`'s parse error: what the wrapper has Lean
+evaluate for the letters that the fields of a format string are for. -/
+def letters (s : String) : IO Unit := do
+  IO.print (" ".intercalate (← IO.ofExcept (Formula.parse s)).letters)
 
 end Tableau
