@@ -1,4 +1,4 @@
-import RTableau.Formula
+import RTableau.Model
 
 namespace Tableau
 
@@ -90,67 +90,6 @@ where
   lines (ls : List Line) : String := s!"[{", ".intercalate (ls.map fun l => s!"{repr l}")}]"
 
 end Tree
-
--- The Kripke model that a branch describes, drawn: its worlds as a tree, each with what the
--- branch says there of the sentence letters and the comparisons.
-namespace Model
-
-/-- What the `branch` says at world `i` of a sentence letter or a comparison: that it holds or
-that it doesn't, in the order of the branch. -/
-def facts (branch : List Line) (i : Nat) : List Formula :=
-  (branch.filterMap fun
-    | .fml k A =>
-      match A with
-      | .atom _ | ∼(.atom _) | □_ ≺ □_ | □_ ≼ □_ | ∼(□_ ≺ □_) | ∼(□_ ≼ □_) => if k = i then some A else none
-      | _ => none
-    | _ => none).eraseDups
-
-/-- The worlds that the rules for `¬□` and `◇` started from world `i`. The other worlds that
-see one of them are older than `i`: they are those that see `i`, by transitivity. -/
-def started (branch : List Line) (i : Nat) : List Nat :=
-  branch.filterMap fun
-    | .rel k j => if k = i && branch.all (fun | .rel m n => n ≠ j || m ≤ i | _ => true) then some j else none
-    | _ => none
-
-/-- The comparisons that the `branch` speaks of, in its order. A drawing names them `c₁`, `c₂`
-and so on, since they are long, and what is written by a world is what sets the worlds apart. -/
-def comparisons (branch : List Line) : List Formula :=
-  (branch.filterMap fun
-    | .fml _ (∼(□A ≺ □B)) | .fml _ (□A ≺ □B) => some (□A ≺ □B)
-    | .fml _ (∼(□A ≼ □B)) | .fml _ (□A ≼ □B) => some (□A ≼ □B)
-    | _ => none).eraseDups
-
-/-- A fact in the LaTeX style `s`, with the name of a comparison in place of it. -/
-def fact (branch : List Line) (s : Formula.Style) : Formula → String
-  | ∼A => s.neg ++ fact branch s A
-  | A =>
-    match (comparisons branch).idxOf? A with
-    | some n => s!"c_\{{n + 1}}"
-    | none => A.render s
-
-/-- World `i` and the worlds below it, as a tree of the `forest` LaTeX package, `i` at depth
-`d`: a node for each, of two parts, the world and what the branch says there, with the nodes of
-the worlds it started nested in it. -/
-partial def tree (branch : List Line) (s : Formula.Style) (i d : Nat) : String :=
-  let says := match facts branch i with
-    | [] => ""
-    | fs => s!"$\\Vdash {", ".intercalate (fs.map (fact branch s))}$"
-  s!"\n{"".pushn ' ' (2 * d)}[\{$w_\{{i}}$\\nodepart\{two}{says}}{"".intercalate ((started branch i).map (tree branch s · (d + 1)))}]"
-
-/-- The model as a tree of the `forest` LaTeX package, which also needs `amssymb` and the TikZ
-library `shapes.multipart`, in the LaTeX style `s`: an arrow from each world to the worlds it
-started, the others that it sees being those further down, and below them what the names of
-the comparisons stand for. A world is midway above the first and last of the worlds it started,
-which are side by side, and `forest` puts them as far apart as what is drawn below each and
-written to its right takes: it has the sizes of what is typeset, which are not to be had here. -/
-def tex (branch : List Line) (s : Formula.Style) : String :=
-  let key := (comparisons branch).map fun c =>
-    s!"\n  \\node[anchor=north, inner sep=0pt] at ([yshift=-3mm]current bounding box.south) \{${fact branch s c} = {c.render s}$};"
-  "\\begin{forest}\n  for tree={rectangle split, rectangle split horizontal, rectangle split parts=2, inner sep=2pt,\n"
-    ++ "    anchor=text, parent anchor=one south, child anchor=one north, l=12mm, l sep=0pt, s sep=5mm,\n"
-    ++ "    edge={->, >=stealth}}" ++ tree branch s 0 1 ++ "".intercalate key ++ "\n\\end{forest}\n"
-
-end Model
 
 /-- A world `i` where `A, i` and `¬A, i`, or `⊥, i`, are on the branch: the one of the first
 line `¬A, i` or `⊥, i` that makes it so. The branch is `old` and then `new`, and `old` has no
@@ -299,6 +238,52 @@ where
       | some t => t
       | none => next branch todo
 
+-- The model that an open branch describes: its worlds as a tree, each with the sentence
+-- letters the branch has there and an order that the comparisons it has there allow.
+
+/-- The worlds that the rules for `¬□` and `◇` started from world `i`. The other worlds that
+see one of them are older than `i`: they are those that see `i`, by transitivity. -/
+def started (branch : List Line) (i : Nat) : List Nat :=
+  branch.filterMap fun
+    | .rel k j => if k = i && branch.all (fun | .rel m n => n ≠ j || m ≤ i | _ => true) then some j else none
+    | _ => none
+
+/-- An order that satisfies the comparisons on the `branch` at world `i`, which have no circle:
+the formulas whose boxes they compare, `A` for `□A`, each as early as they allow. A formula is
+after the first formula of each strict comparison it is the second of, and no earlier than that
+of each other one, which as many rounds as there are formulas see to. -/
+def witnessed (branch : List Line) (i : Nat) : List (List Formula) :=
+  let es := edges branch i
+  let formulas := (es.flatMap fun (_, A, B) => [A, B]).eraseDups
+  let round (when : List (Formula × Nat)) : List (Formula × Nat) :=
+    when.map fun (B, n) => (B, es.foldl (fun n (c, A, B') =>
+      if B' = B then max n (((when.lookup A).getD 0) + (match c with | □_ ≺ □_ => 1 | _ => 0)) else n) n)
+  let when := formulas.length.repeat round (formulas.map (·, 0))
+  (List.range formulas.length).filterMap fun n =>
+    match (when.filter (·.2 = n)).map (·.1) with
+    | [] => none
+    | together => some together
+
+namespace Model
+
+/-- The model that the open `branch` describes, from world `i` down, as the completeness of the
+rules has it: the worlds that each world started below it, the letters that the branch has at a
+world holding there and no others, and at each world an order that satisfies the comparisons
+the branch has there. What is on the branch is true in it. -/
+partial def ofBranch (branch : List Line) (i : Nat := 0) : Model where
+  letters := (branch.filterMap fun
+    | .fml k (.atom a) => if k = i then some a else none
+    | _ => none).eraseDups
+  order := (witnessed branch i).map (·.map fun A => toString (□A))
+  sees := (started branch i).map fun j => ofBranch branch j
+
+/-- The model without the orders that order nothing: those of one list, which only put what is
+in it before what is not. A branch asks that of no world, so its model can do without. -/
+partial def plain (m : Model) : Model :=
+  { m with order := if m.order.length ≤ 1 then [] else m.order, sees := m.sees.map plain }
+
+end Model
+
 end Tableau
 
 /-- A tableau for `sentence`: what the procedure builds below `¬sentence, 0`. -/
@@ -317,17 +302,23 @@ def tex (t : Tableau) (s : Formula.Style := .tex) : String :=
   "\\begin{prooftree}{not line numbering}" ++ Tree.chain s [.fml 0 ∼t.sentence] 1 (t.tree.tex s 2)
     ++ "\n\\end{prooftree}\n"
 
-/-- The models that the tableau's open branches describe, each as a tree of `forest`, the branches
-from left to right: none if the tableau closed, and one for branches that are drawn the same.
-Of a sentence of GL each is a countermodel: a finite tree, read as the transitive order it
-generates, at whose first world the sentence fails, however the letters the branch doesn't
-speak of at a world are valued there. Of a sentence with comparisons each is a countermodel
-too, a model of R⁻: the comparisons the branch doesn't speak of at a world hold there or don't
-as the boxed formulas came to hold on the way down to it, those that came to hold together in
-any order that the comparisons the branch does speak of there allow. They are in the LaTeX
-style `s`. -/
-def modelsTex (t : Tableau) (s : Formula.Style := .tex) : List String :=
-  (t.tree.openBranches.map fun branch => Model.tex (.fml 0 ∼t.sentence :: branch) s).eraseDups
+/-- The models that the tableau's open branches describe, the branches from left to right: none
+if the tableau closed, and one for branches that describe the same. Each is a countermodel, a
+model of R⁻ at whose first world the sentence fails, and of a sentence of GL a model of GL: a
+finite tree, read as the transitive order it generates. A letter holds at a world if the branch
+has it there. The boxed formulas that come to hold at a world are witnessed in an order that
+the comparisons the branch has there allow, and the model has an order only at a world where
+that sets some of those before others. -/
+def models (t : Tableau) : List Model :=
+  (t.tree.openBranches.map fun branch => (Model.ofBranch (.fml 0 ∼t.sentence :: branch)).trimmed.plain).foldl
+    (fun found m => if found.any (·.lean == m.lean) then found else found ++ [m]) []
+
+/-- The tableau's `models`, each as a Lean term. -/
+def modelsLean (t : Tableau) : List String := t.models.map (·.lean)
+
+/-- The tableau's `models`, each as a tree of the `forest` LaTeX package, in the LaTeX style
+`s`. -/
+def modelsTex (t : Tableau) (s : Formula.Style := .tex) : List String := t.models.map (·.tex s)
 
 /-- The LaTeX that `print` gives of the tableau, in a LaTeX style, as a Python format string
 with a replacement field for each sentence letter, `{0}` for the first of `t.sentence.letters`:

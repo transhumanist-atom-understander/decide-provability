@@ -28,16 +28,21 @@ then `∧`, `∨`, `→`, `↔`, each associating to the right, `⊤` is read as
 `Tableau.decide` takes a second argument, what to print of the tableau in place of the file.
 `#eval Tableau.decide A (·.tex)` prints the tableau as a `prooftree` of the `prooftrees` LaTeX
 package, with its sentence letters as they are. `#eval Tableau.decide A ("\n".intercalate ·.modelsTex)` prints the
-models that the open branches describe, from left to right and one for branches that are drawn
+models that the open branches describe, from left to right and one for branches that describe
 the same, each as a tree of the `forest` LaTeX package, for a document that also has the package
 `amssymb` and the TikZ library `shapes.multipart`, with a blank line between them, or nothing if
-the tableau closed. A model is drawn with its worlds as a tree, an arrow from each
-to the worlds that the rules for `¬□` and `◇` started from it, which stands for the transitive
-order that generates, and by each world what the branch says there of the sentence letters and
-the comparisons, which are named `c₁`, `c₂` and so on there and spelled out below the worlds,
-to keep the drawing narrow. Each is a countermodel, however the letters a world says nothing of
-are valued there; the comparisons it says nothing of are then settled by how the boxed formulas
-came to hold on the way down to it, [as below](#why-they-are-complete).
+the tableau closed; with `·.modelsLean` in place of `·.modelsTex`, each as a Lean term, a
+[model](#models) that Lean reads again, on lines of its own. A model is drawn with its worlds as a tree, an arrow from each to the worlds just below
+it, which stands for the transitive order that generates, and by each world what holds there:
+its sentence letters, and the order in which the boxed formulas that first hold there are
+witnessed. The boxed formulas are named `b₁`, `b₂` and so on there and spelled out below the
+worlds, to keep the drawing narrow. Each is a countermodel.
+
+`#eval Tableau.satisfied A m` prints whether the sentence `A` holds in the model `m`, a Lean
+term, and builds no tableau: `#eval Tableau.satisfied "□p → p" {}` prints `false`, so `□p → p`
+is not a theorem. `#eval Tableau.model m (·.tex)` prints `m` as that tree of `forest`, and
+`#eval Tableau.model m` as the Lean term again. Each fails with what is wrong with `m`, if
+it has a letter that no sentence has, or something in an order that is not a boxed formula.
 
 A sentence letter is printed as it is, in LaTeX too, so one that is LaTeX is as LaTeX has it:
 `\varphi`, or `p_{1}`. What the LaTeX is for `φ` is not for this library to know. The wrapper
@@ -48,7 +53,9 @@ for the first, where the letter would be, and the braces that are LaTeX's double
 turns each letter into LaTeX and formats the string with them. `fun t s => t.modelsTex s` and
 the like take the place of `fun t s => t.tex s`: `s` is how to spell the connectives and the
 letters, a `Formula.Style`. `#eval Tableau.sentenceTex A` prints such a format string for the
-sentence alone, and builds no tableau for it.
+sentence alone, and builds no tableau for it. `#eval Tableau.model m (·.format)` prints the
+letters of the model `m`, with a space between them, and on the lines after that such a format
+string for its tree.
 
 The REPL is required at the tag for this project's toolchain, so the two move together, and is
 built here as the executable `repl`, with the library linked in. The REPL interprets the Lean it
@@ -182,10 +189,49 @@ provable, `⊡(Π ↔ □□Π ≺ □Π) → □Π`: the tableau here has 10 br
 with just the axioms for persistence and true before false as premises, the comparison read as a
 sentence letter, has 9,500 branches and 26,000 lines.
 
+## Models
+
+A model is a Lean term of the type `Tableau.Model`, a world and the worlds below it:
+
+    { sees := [{ letters := ["p"], order := [["□q"], ["□p", "□r"]] }, {}] }
+
+`letters` are the sentence letters that hold at the world; `sees` is the worlds just below it,
+each such a term; and `order` is for the boxed formulas that first hold at the world, written as
+in a sentence: those of a list are witnessed together, before those of the next list, and those
+in no list after them all, together. A field that is left out is empty, so `{}` is a world where
+no letter holds, with no world below, and that is a model: the one where `□p → p` fails.
+
+The tree is read as the transitive order it generates. A boxed formula holds at a world if its
+formula holds at every world below it, so from the world where it first holds on down, and it
+is witnessed there: after the boxed formulas that held already at the world above, which keep
+their order, and among the others that first hold there as the world's order has it. `□A ≺ □B`
+holds at a world if `□A` holds there and `□B` doesn't, or was witnessed after it, and `□A ≼ □B`
+if `□A` holds there and `□B` doesn't, or wasn't witnessed before it. An order says nothing of a
+boxed formula that doesn't first hold at its world, whatever is written there.
+
+That is all a model of R⁻ is, [as above](#why-they-are-complete), so every term of the type is
+one, and there is nothing to check of a model before asking what holds in it: a sentence that
+doesn't hold at the first world of one is not a theorem of R⁻. A model can be written by hand,
+then, and `Tableau.satisfied` asked whether it is a countermodel, where that is easier than
+building the tableau, or the tableau is too large to build. What holds is worked out for all
+the worlds at once, a formula after the formulas it is made of, so it takes time in proportion
+to the size of the sentence, and to the square of the number of worlds.
+
+The model of an open branch has the worlds of the branch, each below the world that started it,
+and the letters that the branch has at a world hold there, and no others. For the order of a
+world it takes the comparisons that the branch has there, and has each boxed formula witnessed
+as early as they allow: after the first formula of each strict comparison it is the second of,
+and no earlier than that of each other. Then it leaves out of an order what doesn't first hold
+at its world, and leaves out the order where what is left is all witnessed together, since
+the branch asks nothing more of that world than no order gives. So most worlds have no order,
+and a model has one where it matters to the sentence.
+
 ## Files
 
 - `RTableau/Formula.lean`: formulas, their parser, and their LaTeX and Lean printers.
-- `RTableau/Tableau.lean`: lines, the tree a tableau builds, the rules, the procedure, the drawing of
-  an open branch's model, and the `Tableau` a Lean file defines.
-- `RTableau.lean`: the library, the two modules above.
+- `RTableau/Model.lean`: models, what holds in one, and their LaTeX and Lean printers. It needs
+  nothing of the tableaux.
+- `RTableau/Tableau.lean`: lines, the tree a tableau builds, the rules, the procedure, the model of
+  an open branch, and the `Tableau` a Lean file defines.
+- `RTableau.lean`: the library, the three modules above.
 - `Main.lean`: the executable `repl`, the REPL with the library linked in.
